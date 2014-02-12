@@ -22,8 +22,9 @@ int S_MIN = 0;
 int S_MAX = 256;
 int V_MIN = 0;
 int V_MAX = 256;
-int cP1 = 100;
-int cP2 = 25;
+int cP1 = 400; 
+int cP2 = 30; //cerist papper
+int maxHoughRadius = 80;
 
 //Skillnad i höjd (y) mellan två punkter i centimeter (tre punkter i triangel används)
 double twoPointsYDiff = 8.66;
@@ -31,12 +32,16 @@ double twoPointsXDiff = 10;
 //pingisboll
 //double ballRadius = 3.8;
 //tennisboll
-double ballRadius = 6.7;
+//double ballRadius = 6.7;
+//Cerist papper stor
+double ballRadius = 3.2;
+//Cerist papper
+//double ballRadius = 2.35;
 //Ska vara två olika, men just nu testas med diagonalen, i grader
 //inbyggd
 //int FOV = 66;
 //Microsoft webcam
-double FOV = 70;
+double FOV = 73;
 
 vector<Object> obs;
 
@@ -51,6 +56,15 @@ void on_trackbar(int, void*)
 	if(DILATE < 1)
 	{
 		DILATE = 1;
+	}
+
+	if(cP1 < 1)
+	{
+		cP1 = 1;
+	}
+	if(cP2 < 1)
+	{
+		cP2 = 1;
 	}
 }
 
@@ -71,6 +85,7 @@ void createTrackbars(){
 	sprintf_s(TrackbarName, "DILATE", DILATE);
 	sprintf_s(TrackbarName, "CIRCLE_PARAM_1", cP1);
 	sprintf_s(TrackbarName, "CIRCLE_PARAM_2", cP2);
+	sprintf_s(TrackbarName, "CIRCLE_RADIUS", maxHoughRadius);
 	//create trackbars and insert them into window
 	//3 parameters are: the address of the variable that is changing when the trackbar is moved(eg.H_LOW),
 	//the max value the trackbar can move (eg. H_HIGH), 
@@ -85,8 +100,9 @@ void createTrackbars(){
 	createTrackbar("MINAREA", trackbarWindowName, &MINAREA, 3000, on_trackbar );
 	createTrackbar("ERODE", trackbarWindowName, &ERODE, 20, on_trackbar);
 	createTrackbar("DILATE", trackbarWindowName, &DILATE, 20, on_trackbar);
-	createTrackbar("CIRCLE_PARAM_1", trackbarWindowName, &cP1, 400, on_trackbar);
-	createTrackbar("CIRCLE_PARAM_2", trackbarWindowName, &cP2, 400, on_trackbar);
+	createTrackbar("CIRCLE_PARAM_1", trackbarWindowName, &cP1, 500, on_trackbar);
+	createTrackbar("CIRCLE_PARAM_2", trackbarWindowName, &cP2, 100, on_trackbar);
+	createTrackbar("CIRCLE_RADIUS", trackbarWindowName, &maxHoughRadius, 250, on_trackbar);
 }
 
 void morphOps(Mat &thresh){
@@ -111,6 +127,11 @@ void morphOps(Mat &thresh){
 
 }
 
+bool sorting(Object obj1, Object obj2)
+{
+	return obj1.getPrio() > obj2.getPrio();
+}
+
 void drawObject(vector<Object> objects, Mat &frame){
 	for (int i = 0; i < objects.size(); i++){
 		int j = (i+1)%objects.size();
@@ -119,21 +140,27 @@ void drawObject(vector<Object> objects, Mat &frame){
 	}
 }
 
-double Distance(Object a, Object b){
+double distance(Object a, Object b){
 	return sqrt((a.getXPos()-b.getXPos())*(a.getXPos()-b.getXPos()) + (a.getYPos()-b.getYPos())*(a.getYPos()-b.getYPos()));
 }
+double distance(Object a, double X, double Y){
+	return sqrt((a.getXPos()-X)*(a.getXPos()-X) + (a.getYPos()-Y)*(a.getYPos()-Y));
+}
+double radiusDiff(Object a, double radius){
+	return abs(a.getRadius() - radius);
+}
 
-bool trackObjects(Mat &threshold, Mat &frame) {
+
+bool trackObjects(Mat &threshold, Mat &frame, Mat &gray) {
 	double posX;
 	double posY;
 	int top = -1;
 	int left = -1;
 	int right = -1;
 	bool found = false;
-	//Temp av threshold (den svarta bilden)
 	Mat temp;
-	Moments mom;
 	threshold.copyTo(temp);
+	Moments mom;
 	vector< vector<Point> > contours;
 	vector<Vec4i> hierarchy;
 
@@ -157,31 +184,151 @@ bool trackObjects(Mat &threshold, Mat &frame) {
 
 				if (posX >= 0 && posY >= 0) {
 					found = true;
+					//Object är hittat, lägg till i listan!
 					Object o;
 					o.setXPos(posX);
 					o.setYPos(posY);
 					o.setArea(area);
 					o.setRadius(sqrt(area/PI));
 					obs.push_back(o);
+					Point center(cvRound(posX), cvRound(posY));
+					int radius = cvRound(sqrt(area/PI));
+					circle( frame, center, radius, Scalar(0,0,100));
 				}
 			}
 		}
 	}
 
+	////////////////Circle detection////////////////////////////
+
+	vector<Vec3f> circles;
+
+	/// Apply the Hough Transform to find the circles
+	HoughCircles(gray, circles, CV_HOUGH_GRADIENT, 1, 80, cP1, cP2, 0, maxHoughRadius);
+
+	/// Draw the circles detected
+	for( size_t i = 0; i < circles.size(); i++ )
+	{
+		Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
+		int radius = cvRound(circles[i][2]);
+		// circle outline
+		circle( frame, center, radius, Scalar(255,0,0));
+	}
+
+	//Match the objects with the circles
+	
+	for(int i = 0; i < obs.size(); ++i)
+	{
+		for(int j = 0; j < circles.size(); ++j)
+		{
+			if(obs.at(i).getXPos() - obs.at(i).getRadius()/2 <= circles[j][0] && circles[j][0] <= obs.at(i).getXPos() + obs.at(i).getRadius()/2 &&
+				obs.at(i).getYPos() - obs.at(i).getRadius()/2 <= circles[j][1] && circles[j][1] <= obs.at(i).getYPos() + obs.at(i).getRadius()/2)
+			{
+				//Circlarna är typ samma, fixa prio
+				obs.at(i).setPrio(0.0);
+				obs.at(i).incPrio(1/distance(obs.at(i), circles[j][0], circles[j][1]));
+				obs.at(i).incPrio(1/radiusDiff(obs.at(i), circles[j][2]));
+			}
+		}
+	}
+	
+	std::sort(obs.begin(), obs.end(), sorting);
+
+	/*
+	//Get the three objects with highest prio
+	Object a,b,c;
+	a.setPrio(-1);
+	b.setPrio(-1);
+	c.setPrio(-1);
+	for(int i = 0; i < obs.size(); ++i)
+	{
+		if(obs.at(i).getPrio() >= a.getPrio())
+		{
+			if(obs.at(i).getPrio() >= b.getPrio())
+			{
+				
+				if(obs.at(i).getPrio() >= c.getPrio())
+				{
+					c.setArea(obs.at(i).getArea());
+					c.setXPos(obs.at(i).getXPos());
+					c.setYPos(obs.at(i).getYPos());
+					c.setRadius(obs.at(i).getRadius());
+					c.setPrio(obs.at(i).getPrio());
+
+					b.setArea(c.getArea());
+					b.setXPos(c.getXPos());
+					b.setYPos(c.getYPos());
+					b.setRadius(c.getRadius());
+					b.setPrio(c.getPrio());
+
+					a.setArea(b.getArea());
+					a.setXPos(c.getXPos());
+					a.setYPos(b.getYPos());
+					a.setRadius(b.getRadius());
+					a.setPrio(b.getPrio());
+				}
+				else
+				{
+					b.setArea(obs.at(i).getArea());
+					b.setXPos(obs.at(i).getXPos());
+					b.setYPos(obs.at(i).getYPos());
+					b.setRadius(obs.at(i).getRadius());
+					b.setPrio(obs.at(i).getPrio());
+					
+					a.setArea(b.getArea());
+					a.setXPos(c.getXPos());
+					a.setYPos(b.getYPos());
+					a.setRadius(b.getRadius());
+					a.setPrio(b.getPrio());
+				}
+			}
+			else
+			{
+				a.setArea(obs.at(i).getArea());
+				a.setXPos(obs.at(i).getXPos());
+				a.setYPos(obs.at(i).getYPos());
+				a.setRadius(obs.at(i).getRadius());
+				a.setPrio(obs.at(i).getPrio());
+			}
+		}
+	}
+	obs.clear();
+	if(a.getRadius() > 0)
+	{
+		obs.push_back(a);
+	}
+	if(b.getRadius() > 0)
+	{
+		obs.push_back(b);
+	}
+	if(c.getRadius() > 0)
+	{
+		obs.push_back(c);
+	}
+	*/
+	
+
+	
+	int loops = 3;
+	if(obs.size() < 3)
+	{
+		loops = obs.size();
+	}
+
 	//cout << "framerows: " << frame.rows << "\n";
 	//cout << "framecolumns: " << frame.cols << "\n";
 	cout << "\n\nNumber of hits: " << obs.size() << "\n\n";
-	for(int i=0; i<obs.size(); i++){
-		double zDistance = ballRadius * frame.rows / (2*obs.at(i).getRadius()*tan(FOV * PI/360));
+	for(int i=0; i<loops; i++){
+		double zDistance = ballRadius * frame.cols / (2*obs.at(i).getRadius()*tan(FOV * PI/360));
 		stringstream ss;
 		ss << zDistance;
-		cv::putText(frame, ss.str(), cv::Point(obs.at(i).getXPos(), obs.at(i).getYPos()), 2, 2, cv::Scalar(0,255,0));
+		cv::putText(frame, ss.str(), cv::Point(obs.at(i).getXPos(), obs.at(i).getYPos()), 2, 0.5, cv::Scalar(0,100,0));
 		stringstream ss2;
 		ss2 << obs.at(i).getRadius();
 		cv::putText(frame, ss2.str(), cv::Point(obs.at(i).getXPos(), obs.at(i).getYPos()+40), 1, 1, cv::Scalar(0,255,0));
 	}
 
-	if(obs.size()==3){
+	if(obs.size()>=3){
 		double position[3][3];
 		for(int i=0; i<3; i++){
 			position[i][0] = (frame.cols - obs.at(i).getXPos()) * ballRadius/obs.at(i).getRadius();
@@ -216,12 +363,16 @@ bool trackObjects(Mat &threshold, Mat &frame) {
 		for(int i=0; i<3; i++){
 			vect3[i] = lineLength * vect3[i]/length;
 		}
-		double w = frame.cols/2;
-		double h = frame.rows/2;
-		cv::line(frame, cv::Point(w, h),cv::Point(w + vect1[0], h + vect1[1]),cv::Scalar(255,0,0));
-		cv::line(frame, cv::Point(w, h),cv::Point(w + vect2[0], h + vect2[1]),cv::Scalar(0,255,0));
-		cv::line(frame, cv::Point(w, h),cv::Point(w + vect3[0], h + vect3[1]),cv::Scalar(0,0,255));
+		double w = obs.at(0).getXPos();
+		double h = obs.at(0).getYPos();
+
+		//Koordinatsystem
+		cv::line(frame, cv::Point(w, h),cv::Point(w + vect1[0], h + vect1[1]),cv::Scalar(255,0,0), 3);
+		cv::line(frame, cv::Point(w, h),cv::Point(w + vect2[0], h + vect2[1]),cv::Scalar(0,255,0), 3);
+		cv::line(frame, cv::Point(w, h),cv::Point(w + vect3[0], h + vect3[1]),cv::Scalar(0,0,255), 3);
 	}
+
+	
 
 	/*///////////////////////////////////////////////////////////
 	if (obs.size() == 3) {
@@ -311,10 +462,12 @@ bool trackObjects(Mat &threshold, Mat &frame) {
 	return found;
 }
 
+
+
 int main(int argc, char** argv)
 {
 	VideoCapture cam(0);
-	Sleep(1000);
+	//Sleep(1000);
 
 	if (!cam.isOpened()) {
 		cout << "Error loading camera";
@@ -331,18 +484,34 @@ int main(int argc, char** argv)
 	//grayscale image
 	Mat gray;
 
+	/** Microsoft webcam
+	    Blått papper
+		YCrCp färger
+		*/
+	H_MIN = 74;
+	H_MAX = 163;
+	S_MIN = 133;
+	S_MAX = 184;
+	V_MIN = 0;
+	V_MAX = 256;
+	MINAREA = 750;
+	ERODE = 13;
+	DILATE = 13;
 
-	/* Microsoft webcam 
+	/* Microsoft webcam */
+	/*CERIST PAPPER
 	H_MIN = 112;
 	H_MAX = 195;
-	S_MIN = 137;
+	S_MIN = 128;
 	S_MAX = 196;
 	V_MIN = 154;
 	V_MAX = 254;
 	MINAREA = 370;
+	cP1 = 300;
 	ERODE = 3;
-	DILATE = 7;
-	*/
+	DILATE = 4; //7*/
+	
+	
 	/* inbyggd kamera
 	H_MIN = 35;
 	H_MAX = 68;
@@ -365,7 +534,8 @@ int main(int argc, char** argv)
 	ERODE = 4;
 	DILATE = 5;
 	*/
-	/* inbyggd kamera tennisboll*/
+	/* inbyggd kamera tennisboll
+	
 	H_MIN = 68;
 	H_MAX = 98;
 	S_MIN = 46;
@@ -374,12 +544,12 @@ int main(int argc, char** argv)
 	V_MAX = 256;
 	MINAREA = 1500;
 	ERODE = 4;
-	DILATE = 5;
+	DILATE = 5;*/
 	
 	
 	createTrackbars();
 
-	Sleep(1000);
+	//Sleep(1000);
 
 	CvCapture* capture = cvCreateCameraCapture(0);
 
@@ -394,12 +564,17 @@ int main(int argc, char** argv)
 		GaussianBlur(frame, frame, Size(3, 3), 0, 0);
 
 		// Convert from RGB to HSV
-		cvtColor(frame, hsvFrame, COLOR_RGB2HSV);
+		cvtColor(frame, hsvFrame, COLOR_RGB2YCrCb);
 
 		// Convert to binary B&W
 		inRange(hsvFrame, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX), threshold);
 
+		//Gaussian the black/white image
 		GaussianBlur(threshold, threshold, Size(3, 3), 0, 0);
+		//Convert to grayscale
+		cvtColor(frame, gray, CV_BGR2GRAY);
+		//Gaussian the grey image
+		GaussianBlur(gray, gray, Size(3, 3), 0, 0);
 
 
 		//morphops the binary image
@@ -407,38 +582,21 @@ int main(int argc, char** argv)
 
 		if (!frame.empty()){
 			try {
+
 				// Tracking	
-				bool found = trackObjects(threshold, frame);
+				bool found = trackObjects(threshold, frame, gray);
 				if (found) {
 					drawObject(obs, frame);
 				}
 
-				////////////////Circle detection////////////////////////////
-
-				//Convert to grayscale
-				//cvtColor(frame, gray, CV_BGR2GRAY);
-				gray = threshold;
+				//Canny(gray, gray, cP1/3, cP1);
 				
-				GaussianBlur(gray, gray, Size(3, 3), 0, 0);
-
-				vector<Vec3f> circles;
-
-				/// Apply the Hough Transform to find the circles
-				HoughCircles( gray, circles, CV_HOUGH_GRADIENT, 1, 40, cP1, cP2, 30, 100);
-
-				/// Draw the circles detected
-				 for( size_t i = 0; i < circles.size(); i++ )
-				{
-					  Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
-					  int radius = cvRound(circles[i][2]);
-					 // circle outline
-					 circle( frame, center, radius, Scalar(255,0,0));
-				 }
 
 				// Display image
 				imshow("Image", frame);
-				imshow("HSV image", hsvFrame);
+				//imshow("YCrCb image", hsvFrame);
 				imshow("Binary image", threshold);
+				//imshow("Gray image", gray);
 			}
 			catch (cv::Exception & e)
 			{

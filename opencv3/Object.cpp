@@ -10,6 +10,7 @@ Object::~Object(void)
 {
 }
 
+
 double Object::getXPos(){
 
 	return Object::xPos;
@@ -67,4 +68,20 @@ void Object::setType(string t){
 
 	Object::type = t;
 
+}
+
+double Object::getPrio(){
+	return Object::prio;
+}
+
+void Object::incPrio(double prio){
+	Object::prio+=prio;
+}
+
+void Object::decPrio(double prio){
+	Object::prio-=prio;
+}
+
+void Object::setPrio(double prio){
+	Object::prio = prio;
 }

@@ -23,9 +23,14 @@ public:
 	string getType();
 	void setType(string t);
 
+	double getPrio();
+	void incPrio(double prio);
+	void decPrio(double prio);
+	void setPrio(double prio);
+
 private:
 
-	double xPos, yPos, area, radius;
+	double xPos, yPos, area, radius, prio;
 	string type;
 
 };
