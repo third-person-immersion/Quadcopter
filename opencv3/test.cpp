@@ -44,6 +44,7 @@ double ballRadius = 3.2;
 double FOV = 73;
 
 vector<Object> obs;
+vector<Object> both;
 
 void on_trackbar(int, void*)
 {//This function gets called whenever a
@@ -133,23 +134,31 @@ bool sorting(Object obj1, Object obj2)
 }
 
 void drawObject(vector<Object> objects, Mat &frame){
-	for (int i = 0; i < objects.size(); i++){
-		int j = (i+1)%objects.size();
-		cv::circle(frame, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), objects.at(i).getRadius(), cv::Scalar(0, 0, 255));
+	int loops = 3;
+	if(objects.size() < 3)
+	{
+		loops = objects.size();
+	}
+	for(int i = 0; i < loops; ++i)
+	{
+		int j = (i+1)%loops;
 		cv::line(frame, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), cv::Point(objects.at(j).getXPos(), objects.at(j).getYPos()),cv::Scalar(0, 0, 255));
+	}
+	for (int i = 0; i < objects.size(); i++){
+		
+		cv::circle(frame, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), objects.at(i).getRadius(), cv::Scalar(0, 0, 255));
 	}
 }
 
-double distance(Object a, Object b){
+double distanceFUCK(Object a, Object b){
 	return sqrt((a.getXPos()-b.getXPos())*(a.getXPos()-b.getXPos()) + (a.getYPos()-b.getYPos())*(a.getYPos()-b.getYPos()));
 }
-double distance(Object a, double X, double Y){
+double distanceFUCK(Object a, double X, double Y){
 	return sqrt((a.getXPos()-X)*(a.getXPos()-X) + (a.getYPos()-Y)*(a.getYPos()-Y));
 }
 double radiusDiff(Object a, double radius){
 	return abs(a.getRadius() - radius);
 }
-
 
 bool trackObjects(Mat &threshold, Mat &frame, Mat &gray) {
 	double posX;
@@ -163,12 +172,19 @@ bool trackObjects(Mat &threshold, Mat &frame, Mat &gray) {
 	Moments mom;
 	vector< vector<Point> > contours;
 	vector<Vec4i> hierarchy;
+	vector<Object> circles;
+	vector<Vec3f> circlesTemp;
+
+
 
 	//find contours of filtered image using openCV findContours function
 	findContours(temp, contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_NONE);
 
+	//Check if any filtered objects was found
 	if (hierarchy.size() > 0) {
+		//If so, clear the object and "both" vector
 		obs.clear(); // Clear the list of objects
+		both.clear();
 		int numObjects = hierarchy.size();
 		for (int index = 0; index >= 0; index = hierarchy[index][0]) {
 			mom = moments((Mat)contours[index], 1);
@@ -179,18 +195,21 @@ bool trackObjects(Mat &threshold, Mat &frame, Mat &gray) {
 			if (area > MINAREA) {
 				posX = moment10 / area;
 				posY = moment01 / area;
-
 				
 
 				if (posX >= 0 && posY >= 0) {
+					//A true object is found
 					found = true;
-					//Object är hittat, lägg till i listan!
+					//Add this object to the object vector
 					Object o;
 					o.setXPos(posX);
 					o.setYPos(posY);
 					o.setArea(area);
 					o.setRadius(sqrt(area/PI));
+					o.setPrio(0.0);
+					o.setHasCircle(false);
 					obs.push_back(o);
+					//Draw the found object in dark red (this is not yet a object which should be tracked)
 					Point center(cvRound(posX), cvRound(posY));
 					int radius = cvRound(sqrt(area/PI));
 					circle( frame, center, radius, Scalar(0,0,100));
@@ -198,142 +217,167 @@ bool trackObjects(Mat &threshold, Mat &frame, Mat &gray) {
 			}
 		}
 	}
+	
 
-	////////////////Circle detection////////////////////////////
+	// Apply the Hough Transform to find the circles in the frame
+	HoughCircles(gray, circlesTemp, CV_HOUGH_GRADIENT, 1, 80, cP1, cP2, 0, maxHoughRadius);
 
-	vector<Vec3f> circles;
+	cout << "Found circles: " << circlesTemp.size() << "\n";
 
-	/// Apply the Hough Transform to find the circles
-	HoughCircles(gray, circles, CV_HOUGH_GRADIENT, 1, 80, cP1, cP2, 0, maxHoughRadius);
-
-	/// Draw the circles detected
-	for( size_t i = 0; i < circles.size(); i++ )
+	// Draw the detected circles
+	for(int i = 0; i < circlesTemp.size(); i++ )
 	{
-		Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
-		int radius = cvRound(circles[i][2]);
+		Point center(cvRound(circlesTemp[i][0]), cvRound(circlesTemp[i][1]));
+		int radius = cvRound(circlesTemp[i][2]);
 		// circle outline
-		circle( frame, center, radius, Scalar(255,0,0));
+		circle( frame, center, radius, Scalar(255,0,255), 3);
+		//Convert the circles to objects and put them in the "both" vector
+		Object o;
+		o.setXPos(circlesTemp[i][0]);
+		o.setYPos(circlesTemp[i][1]);
+		o.setArea(circlesTemp[i][2]*circlesTemp[i][2]*PI);
+		o.setRadius(circlesTemp[i][2]);
+		o.setPrio(0.0);
+		o.setHasCircle(false);
+		circles.push_back(o);
 	}
-
-	//Match the objects with the circles
 	
-	for(int i = 0; i < obs.size(); ++i)
+	//Match the objects with the circles and set the prio
+	bool matchingCircles = false;
+	int objectsWithCircle = 0;
+	
+	for(int i = 0; i < obs.size(); ++i) //Loop obs
 	{
-		for(int j = 0; j < circles.size(); ++j)
+		for(int j = 0; j < circles.size(); ++j) //Loop circles
 		{
-			if(obs.at(i).getXPos() - obs.at(i).getRadius()/2 <= circles[j][0] && circles[j][0] <= obs.at(i).getXPos() + obs.at(i).getRadius()/2 &&
-				obs.at(i).getYPos() - obs.at(i).getRadius()/2 <= circles[j][1] && circles[j][1] <= obs.at(i).getYPos() + obs.at(i).getRadius()/2)
+			//Check if the radius and position of the circles and the filtered objects match
+			if(obs.at(i).getXPos() - obs.at(i).getRadius()/2 <= circles.at(j).getXPos() && circles.at(j).getXPos() <= obs.at(i).getXPos() + obs.at(i).getRadius()/2 &&
+				obs.at(i).getYPos() - obs.at(i).getRadius()/2 <= circles.at(j).getYPos() && circles.at(j).getYPos() <= obs.at(i).getYPos() + obs.at(i).getRadius()/2)
 			{
-				//Circlarna är typ samma, fixa prio
-				obs.at(i).setPrio(0.0);
-				obs.at(i).incPrio(1/distance(obs.at(i), circles[j][0], circles[j][1]));
-				obs.at(i).incPrio(1/radiusDiff(obs.at(i), circles[j][2]));
+				circles.at(j).setHasCircle(true); //temp
+				//We have matching circles/filtered obejcts
+				matchingCircles = true;
+				//set the prio for the filtered objects
+				obs.at(i).incPrio(abs(1/distanceFUCK(obs.at(i), circles.at(j).getXPos(), circles.at(j).getYPos())));
+				obs.at(i).incPrio(abs(1/radiusDiff(obs.at(i), circles.at(j).getRadius())));
+				obs.at(i).incPrio(2);
+				//Say the filtered object has a corresponding circle
+				obs.at(i).setHasCircle(true);
+				objectsWithCircle++;
 			}
 		}
 	}
 	
-	std::sort(obs.begin(), obs.end(), sorting);
 
-	/*
-	//Get the three objects with highest prio
-	Object a,b,c;
-	a.setPrio(-1);
-	b.setPrio(-1);
-	c.setPrio(-1);
-	for(int i = 0; i < obs.size(); ++i)
+	int tempAmount = 0;
+	//Add the circles which does not belong to any filtered object into the "both" vector
+	for (int i = 0; i < circles.size(); ++i)
 	{
-		if(obs.at(i).getPrio() >= a.getPrio())
+		if(!circles.at(i).getHasCircle())
 		{
-			if(obs.at(i).getPrio() >= b.getPrio())
-			{
-				
-				if(obs.at(i).getPrio() >= c.getPrio())
-				{
-					c.setArea(obs.at(i).getArea());
-					c.setXPos(obs.at(i).getXPos());
-					c.setYPos(obs.at(i).getYPos());
-					c.setRadius(obs.at(i).getRadius());
-					c.setPrio(obs.at(i).getPrio());
+			tempAmount++;
+			both.push_back(circles.at(i));
+		}
+		
+	}
+	cout << "Added circles: " << tempAmount << "\n";
+	
+	//Add all filtered objects to the "both" vector
+	for (int i = 0; i < obs.size(); ++i)
+	{
+		both.push_back(obs.at(i));
+	}
 
-					b.setArea(c.getArea());
-					b.setXPos(c.getXPos());
-					b.setYPos(c.getYPos());
-					b.setRadius(c.getRadius());
-					b.setPrio(c.getPrio());
+	//Calculate the avg radius of _all_ circles, as long as it has a corresponding circle
+	double radiusAvg = 0;
+	int matchedCircles = 0;
 
-					a.setArea(b.getArea());
-					a.setXPos(c.getXPos());
-					a.setYPos(b.getYPos());
-					a.setRadius(b.getRadius());
-					a.setPrio(b.getPrio());
-				}
-				else
-				{
-					b.setArea(obs.at(i).getArea());
-					b.setXPos(obs.at(i).getXPos());
-					b.setYPos(obs.at(i).getYPos());
-					b.setRadius(obs.at(i).getRadius());
-					b.setPrio(obs.at(i).getPrio());
-					
-					a.setArea(b.getArea());
-					a.setXPos(c.getXPos());
-					a.setYPos(b.getYPos());
-					a.setRadius(b.getRadius());
-					a.setPrio(b.getPrio());
-				}
-			}
-			else
-			{
-				a.setArea(obs.at(i).getArea());
-				a.setXPos(obs.at(i).getXPos());
-				a.setYPos(obs.at(i).getYPos());
-				a.setRadius(obs.at(i).getRadius());
-				a.setPrio(obs.at(i).getPrio());
-			}
+	for(int i = 0; i < both.size() && matchingCircles; ++i)
+	{
+		if(both.at(i).getHasCircle())
+		{
+			matchedCircles++;
+			radiusAvg += both.at(i).getRadius();
 		}
 	}
-	obs.clear();
-	if(a.getRadius() > 0)
+	radiusAvg = radiusAvg/matchedCircles;
+
+	cout << "radiusAvg: " << radiusAvg << "\n";
+
+	int objectsWithNoPrio = 0;
+
+	//Objects with prio != 0, check their radius and fix prio
+	for(int i = 0; i < both.size() && matchingCircles; ++i)
 	{
-		obs.push_back(a);
+		if(both.at(i).getHasCircle())
+		{
+			objectsWithNoPrio++;
+			both.at(i).incPrio(1/abs(both.at(i).getRadius() - radiusAvg));
+		}
+		stringstream ss;
+		ss << both.at(i).getPrio();
+		cv::putText(frame, ss.str(), cv::Point(both.at(i).getXPos(), both.at(i).getYPos()-40), 1, 1, cv::Scalar(0, 0, 170), 2);
+
 	}
-	if(b.getRadius() > 0)
-	{
-		obs.push_back(b);
-	}
-	if(c.getRadius() > 0)
-	{
-		obs.push_back(c);
-	}
-	*/
+	
+	
+	cout << "objectsWithNoPrio: " << objectsWithNoPrio << "\n";
+	
+	
+	//Sort the "both" vector with the highest prio first
+	std::sort(both.begin(), both.end(), sorting);
+	
 	
 
+	int dist = 0;
+	if(objectsWithCircle >= 0 && both.size() >= 2)
+	{
+
+		dist = distanceFUCK(both.at(0), both.at(1));
+		cout << "dist: " << dist << "\n";
+		
+		for(int i = 0; i < both.size(); ++i)
+		{
+			both.at(i).incPrio(1/(2*abs(dist - distanceFUCK(both.at(i), both.at(0)))));
+			both.at(i).incPrio(1/(2*abs(dist - distanceFUCK(both.at(i), both.at(0)))));
+		}
+	}
 	
+	
+	//Sort the "both" vector with the highest prio first
+	// must be done again since the loop above can fuck it all up
+	std::sort(both.begin(), both.end(), sorting);
+	
+
+	//If "both" vector is of size >= 3, then only loop 3 times (showing only the 3 circles with highest prio)
 	int loops = 3;
-	if(obs.size() < 3)
+	if(both.size() < 3)
 	{
-		loops = obs.size();
+		loops = both.size();
 	}
 
-	//cout << "framerows: " << frame.rows << "\n";
-	//cout << "framecolumns: " << frame.cols << "\n";
-	cout << "\n\nNumber of hits: " << obs.size() << "\n\n";
+	cout << "\n\nNumber of hits obs:  " << obs.size() << "\n";
+	cout << "\n\nNumber of hits both: " << both.size() << "\n\n";
+	//Calculate the 3D position of the 3 circles with highest prio.
 	for(int i=0; i<loops; i++){
-		double zDistance = ballRadius * frame.cols / (2*obs.at(i).getRadius()*tan(FOV * PI/360));
+		double zDistance = ballRadius * frame.cols / (2*both.at(i).getRadius()*tan(FOV * PI/360));
 		stringstream ss;
 		ss << zDistance;
-		cv::putText(frame, ss.str(), cv::Point(obs.at(i).getXPos(), obs.at(i).getYPos()), 2, 0.5, cv::Scalar(0,100,0));
+		cv::putText(frame, ss.str(), cv::Point(both.at(i).getXPos(), both.at(i).getYPos()), 2, 0.5, cv::Scalar(0,100,0));
 		stringstream ss2;
-		ss2 << obs.at(i).getRadius();
-		cv::putText(frame, ss2.str(), cv::Point(obs.at(i).getXPos(), obs.at(i).getYPos()+40), 1, 1, cv::Scalar(0,255,0));
+		ss2 << both.at(i).getRadius();
+		cv::putText(frame, ss2.str(), cv::Point(both.at(i).getXPos(), both.at(i).getYPos()+40), 1, 1, cv::Scalar(0,255,0));
 	}
 
-	if(obs.size()>=3){
+
+
+	//Allt detta är för koordinatsystemet. Ja.
+	if(both.size()>=3){
 		double position[3][3];
 		for(int i=0; i<3; i++){
-			position[i][0] = (frame.cols - obs.at(i).getXPos()) * ballRadius/obs.at(i).getRadius();
-			position[i][1] = (frame.rows - obs.at(i).getYPos()) * ballRadius/obs.at(i).getRadius();
-			position[i][2] = ballRadius * frame.rows / (2*obs.at(i).getRadius()*tan(FOV * PI/360));
+			position[i][0] = (frame.cols - both.at(i).getXPos()) * ballRadius/both.at(i).getRadius();
+			position[i][1] = (frame.rows - both.at(i).getYPos()) * ballRadius/both.at(i).getRadius();
+			position[i][2] = ballRadius * frame.rows / (2*both.at(i).getRadius()*tan(FOV * PI/360));
 		}
 		
 		double vect1[3];
@@ -363,10 +407,10 @@ bool trackObjects(Mat &threshold, Mat &frame, Mat &gray) {
 		for(int i=0; i<3; i++){
 			vect3[i] = lineLength * vect3[i]/length;
 		}
-		double w = obs.at(0).getXPos();
-		double h = obs.at(0).getYPos();
+		double w = both.at(0).getXPos();
+		double h = both.at(0).getYPos();
 
-		//Koordinatsystem
+		//Koordinatsystemsgrejen (suger)
 		cv::line(frame, cv::Point(w, h),cv::Point(w + vect1[0], h + vect1[1]),cv::Scalar(255,0,0), 3);
 		cv::line(frame, cv::Point(w, h),cv::Point(w + vect2[0], h + vect2[1]),cv::Scalar(0,255,0), 3);
 		cv::line(frame, cv::Point(w, h),cv::Point(w + vect3[0], h + vect3[1]),cv::Scalar(0,0,255), 3);
@@ -586,7 +630,7 @@ int main(int argc, char** argv)
 				// Tracking	
 				bool found = trackObjects(threshold, frame, gray);
 				if (found) {
-					drawObject(obs, frame);
+					drawObject(both, frame);
 				}
 
 				//Canny(gray, gray, cP1/3, cP1);

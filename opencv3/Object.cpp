@@ -85,3 +85,11 @@ void Object::decPrio(double prio){
 void Object::setPrio(double prio){
 	Object::prio = prio;
 }
+
+bool Object::getHasCircle(){
+	return Object::hasCircle;
+}
+
+void Object::setHasCircle(bool value){
+	Object::hasCircle = value;
+}
