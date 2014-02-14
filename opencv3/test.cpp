@@ -16,6 +16,12 @@ using namespace std;
 int MINAREA = 2000;
 int ERODE = 30;
 int DILATE = 60;
+int Y_MIN = 0;
+int Y_MAX = 256;
+int Cb_MIN = 133;
+int Cb_MAX = 184;
+int Cr_MIN = 0;
+int Cr_MAX = 256;
 int H_MIN = 0;
 int H_MAX = 256;
 int S_MIN = 0;
@@ -27,8 +33,8 @@ int cP2 = 30; //cerist papper
 int maxHoughRadius = 80;
 
 //Skillnad i höjd (y) mellan två punkter i centimeter (tre punkter i triangel används)
-double twoPointsYDiff = 8.66;
-double twoPointsXDiff = 10;
+//double twoPointsYDiff = 8.66;
+//double twoPointsXDiff = 10;
 //pingisboll
 //double ballRadius = 3.8;
 //tennisboll
@@ -41,7 +47,7 @@ double ballRadius = 3.2;
 //inbyggd
 //int FOV = 66;
 //Microsoft webcam
-double FOV = 73;
+double FOV = 70;//73; <-- 73 är mer rätt, men bättre med 70 då 73 är för diagonalen
 
 vector<Object> obs;
 vector<Object> both;
@@ -69,18 +75,21 @@ void on_trackbar(int, void*)
 	}
 }
 
-void createTrackbars(){
-	string trackbarWindowName = "trackbars";
+
+void createTrackbars(int number, char* min1, char* max1, char* min2, char* max2, char* min3, char* max3, int *minInt1, int *maxInt1, int *minInt2, int *maxInt2, int *minInt3, int *maxInt3){
+	std::stringstream sstm;
+	sstm << "Trackbars" << number;
+	string trackbarWindowName = sstm.str();
 	//create window for trackbars
 	namedWindow(trackbarWindowName, 0);
 	//create memory to store trackbar name on window
 	char TrackbarName[50];
-	sprintf_s(TrackbarName, "H_MIN", H_MIN);
-	sprintf_s(TrackbarName, "H_MAX", H_MAX);
-	sprintf_s(TrackbarName, "S_MIN", S_MIN);
-	sprintf_s(TrackbarName, "S_MAX", S_MAX);
-	sprintf_s(TrackbarName, "V_MIN", V_MIN);
-	sprintf_s(TrackbarName, "V_MAX", V_MAX);
+	sprintf_s(TrackbarName, min1, minInt1);
+	sprintf_s(TrackbarName, max1, maxInt1);
+	sprintf_s(TrackbarName, min2, minInt2);
+	sprintf_s(TrackbarName, max2, maxInt2);
+	sprintf_s(TrackbarName, min3, minInt3);
+	sprintf_s(TrackbarName, max3, maxInt3);
 	sprintf_s(TrackbarName, "MINAREA", MINAREA);
 	sprintf_s(TrackbarName, "ERODE", ERODE);
 	sprintf_s(TrackbarName, "DILATE", DILATE);
@@ -92,12 +101,12 @@ void createTrackbars(){
 	//the max value the trackbar can move (eg. H_HIGH), 
 	//and the function that is called whenever the trackbar is moved(eg. on_trackbar)
 	//                                  ---->    ---->     ---->      
-	createTrackbar("H_MIN", trackbarWindowName, &H_MIN, 256, on_trackbar);
-	createTrackbar("H_MAX", trackbarWindowName, &H_MAX, 256, on_trackbar);
-	createTrackbar("S_MIN", trackbarWindowName, &S_MIN, 256, on_trackbar);
-	createTrackbar("S_MAX", trackbarWindowName, &S_MAX, 256, on_trackbar);
-	createTrackbar("V_MIN", trackbarWindowName, &V_MIN, 256, on_trackbar);
-	createTrackbar("V_MAX", trackbarWindowName, &V_MAX, 256, on_trackbar);
+	createTrackbar(min1, trackbarWindowName, minInt1, 256, on_trackbar);
+	createTrackbar(max1, trackbarWindowName, maxInt1, 256, on_trackbar);
+	createTrackbar(min2, trackbarWindowName, minInt2, 256, on_trackbar);
+	createTrackbar(max2, trackbarWindowName, maxInt2, 256, on_trackbar);
+	createTrackbar(min3, trackbarWindowName, minInt3, 256, on_trackbar);
+	createTrackbar(max3, trackbarWindowName, maxInt3, 256, on_trackbar);
 	createTrackbar("MINAREA", trackbarWindowName, &MINAREA, 3000, on_trackbar );
 	createTrackbar("ERODE", trackbarWindowName, &ERODE, 20, on_trackbar);
 	createTrackbar("DILATE", trackbarWindowName, &DILATE, 20, on_trackbar);
@@ -160,15 +169,17 @@ double radiusDiff(Object a, double radius){
 	return abs(a.getRadius() - radius);
 }
 
-bool trackObjects(Mat &threshold, Mat &frame, Mat &gray) {
+bool trackObjects(Mat &thresholdYCrCb, Mat &thresholdHSV, Mat &frame, Mat &gray) {
 	double posX;
 	double posY;
 	int top = -1;
 	int left = -1;
 	int right = -1;
 	bool found = false;
-	Mat temp;
-	threshold.copyTo(temp);
+	Mat tempYCrCb;
+	thresholdYCrCb.copyTo(tempYCrCb);
+	Mat tempHSV;
+	thresholdHSV.copyTo(tempHSV);
 	Moments mom;
 	vector< vector<Point> > contours;
 	vector<Vec4i> hierarchy;
@@ -176,9 +187,8 @@ bool trackObjects(Mat &threshold, Mat &frame, Mat &gray) {
 	vector<Vec3f> circlesTemp;
 
 
-
 	//find contours of filtered image using openCV findContours function
-	findContours(temp, contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_NONE);
+	findContours(tempYCrCb, contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_NONE);
 
 	//Check if any filtered objects was found
 	if (hierarchy.size() > 0) {
@@ -258,9 +268,8 @@ bool trackObjects(Mat &threshold, Mat &frame, Mat &gray) {
 				//We have matching circles/filtered obejcts
 				matchingCircles = true;
 				//set the prio for the filtered objects
-				obs.at(i).incPrio(abs(1/distanceFUCK(obs.at(i), circles.at(j).getXPos(), circles.at(j).getYPos())));
-				obs.at(i).incPrio(abs(1/radiusDiff(obs.at(i), circles.at(j).getRadius())));
-				obs.at(i).incPrio(2);
+				obs.at(i).incPrio(abs(2/distanceFUCK(obs.at(i), circles.at(j).getXPos(), circles.at(j).getYPos())));
+				obs.at(i).incPrio(abs(2/radiusDiff(obs.at(i), circles.at(j).getRadius())));
 				//Say the filtered object has a corresponding circle
 				obs.at(i).setHasCircle(true);
 				objectsWithCircle++;
@@ -291,9 +300,10 @@ bool trackObjects(Mat &threshold, Mat &frame, Mat &gray) {
 	//Calculate the avg radius of _all_ circles, as long as it has a corresponding circle
 	double radiusAvg = 0;
 	int matchedCircles = 0;
-
+	//Only check if matchingCircles is true, meaning we have some "true" circles we want to check against
 	for(int i = 0; i < both.size() && matchingCircles; ++i)
 	{
+		//Theses "true" circles will have HasCircle set to true
 		if(both.at(i).getHasCircle())
 		{
 			matchedCircles++;
@@ -306,17 +316,26 @@ bool trackObjects(Mat &threshold, Mat &frame, Mat &gray) {
 
 	int objectsWithNoPrio = 0;
 
-	//Objects with prio != 0, check their radius and fix prio
+	//Objects with prio != 0, meaning HasCircle will be false, check their radius and fix prio
 	for(int i = 0; i < both.size() && matchingCircles; ++i)
 	{
-		if(both.at(i).getHasCircle())
+		//These objects will have no circle
+		if(!both.at(i).getHasCircle())
 		{
 			objectsWithNoPrio++;
 			both.at(i).incPrio(1/abs(both.at(i).getRadius() - radiusAvg));
 		}
+		//Print out the prio on every circle (both circles and filtered)
 		stringstream ss;
 		ss << both.at(i).getPrio();
 		cv::putText(frame, ss.str(), cv::Point(both.at(i).getXPos(), both.at(i).getYPos()-40), 1, 1, cv::Scalar(0, 0, 170), 2);
+
+		//Also print bool if the prio is != 0
+		bool hasPrio = both.at(i).getPrio() > 0;
+		
+		stringstream ss2;
+		ss2 << hasPrio;
+		cv::putText(frame, ss2.str(), cv::Point(both.at(i).getXPos(), both.at(i).getYPos()-20), 1, 1, cv::Scalar(0, 170, 170), 2);
 
 	}
 	
@@ -523,24 +542,52 @@ int main(int argc, char** argv)
 	//Själva "bilden" (den med färg o shiet)
 	Mat frame;
 	Mat hsvFrame;
-	//svartvita bilden (den filtrerade)
-	Mat threshold;
+	Mat ycrcbFrame;
+	//svartvita bilden (den filtrerade) för hsv
+	Mat thresholdHSV;
+	Mat thresholdYCrCb;
 	//grayscale image
 	Mat gray;
 
+	Mat andFUCK;
+
 	/** Microsoft webcam
 	    Blått papper
-		YCrCp färger
-		*/
-	H_MIN = 74;
-	H_MAX = 163;
-	S_MIN = 133;
-	S_MAX = 184;
+		YCbCr färger och HSV färger*/
+	//For YCbCr filtering
+	Y_MIN = 0;
+	Y_MAX = 256;
+	Cr_MIN = 142;
+	Cr_MAX = 256;
+	Cb_MIN = 0;
+	Cb_MAX = 109;
+	//For HSV filtering
+	H_MIN = 0;
+	H_MAX = 93;
+	S_MIN = 91;
+	S_MAX = 256;
 	V_MIN = 0;
 	V_MAX = 256;
+	//Same for both color filters
 	MINAREA = 750;
-	ERODE = 13;
-	DILATE = 13;
+	cP1 = 300;
+	cP2 = 20;
+	ERODE = 1;
+	DILATE = 1;
+
+	/* Microsoft webcam */
+	/*CERIST PAPPER, hemma hos jacob, YCbCr 
+	H_MIN = 68;
+	H_MAX = 147;
+	S_MIN = 121;
+	S_MAX = 195;
+	V_MIN = 0;
+	V_MAX = 256;
+	MINAREA = 370;
+	cP1 = 300;
+	cP2 = 15;
+	ERODE = 1;
+	DILATE = 1; //7*/
 
 	/* Microsoft webcam */
 	/*CERIST PAPPER
@@ -591,10 +638,11 @@ int main(int argc, char** argv)
 	DILATE = 5;*/
 	
 	
-	createTrackbars();
+	createTrackbars(1, "Y_MIN", "Y_MAX", "Cr_MIN", "Cr_MAX", "Cb_MIN", "Cb_MAX", &Y_MIN, &Y_MAX, &Cr_MIN, &Cr_MAX, &Cb_MIN, &Cb_MAX);
+	createTrackbars(2, "H_MIN", "H_MAX", "S_MIN", "S_MAX", "V_MIN", "V_MAX", &H_MIN, &H_MAX, &S_MIN, &S_MAX, &V_MIN, &V_MAX);
 
 	//Sleep(1000);
-
+	
 	CvCapture* capture = cvCreateCameraCapture(0);
 
 
@@ -606,15 +654,21 @@ int main(int argc, char** argv)
 
 		// Blur the image a bit
 		GaussianBlur(frame, frame, Size(3, 3), 0, 0);
-
+		
+		// Convert from RGB to YCrCb
+		cvtColor(frame, ycrcbFrame, COLOR_RGB2YCrCb);
 		// Convert from RGB to HSV
-		cvtColor(frame, hsvFrame, COLOR_RGB2YCrCb);
+		cvtColor(frame, hsvFrame, COLOR_RGB2HSV);
 
-		// Convert to binary B&W
-		inRange(hsvFrame, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX), threshold);
+		// Convert YCrCb to binary B&W
+		inRange(ycrcbFrame, Scalar(Y_MIN, Cr_MIN, Cb_MIN), Scalar(Y_MAX, Cr_MAX, Cb_MAX), thresholdYCrCb);
+		// Convert HSV to binary B&W
+		inRange(hsvFrame, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX), thresholdHSV);
 
-		//Gaussian the black/white image
-		GaussianBlur(threshold, threshold, Size(3, 3), 0, 0);
+		//Gaussian the black/white image for YCrCb
+		GaussianBlur(thresholdYCrCb, thresholdYCrCb, Size(3, 3), 0, 0);
+		//Gaussian the black/white image for HSV
+		GaussianBlur(thresholdHSV, thresholdHSV, Size(3, 3), 0, 0);
 		//Convert to grayscale
 		cvtColor(frame, gray, CV_BGR2GRAY);
 		//Gaussian the grey image
@@ -622,25 +676,32 @@ int main(int argc, char** argv)
 
 
 		//morphops the binary image
-		morphOps(threshold);
+		morphOps(thresholdYCrCb);
+		morphOps(thresholdHSV);
 
 		if (!frame.empty()){
 			try {
+				
+				andFUCK = thresholdYCrCb & thresholdHSV;
 
 				// Tracking	
-				bool found = trackObjects(threshold, frame, gray);
+				bool found = trackObjects(andFUCK, thresholdHSV, frame, gray);
 				if (found) {
 					drawObject(both, frame);
 				}
 
 				//Canny(gray, gray, cP1/3, cP1);
 				
+				
 
 				// Display image
 				imshow("Image", frame);
-				//imshow("YCrCb image", hsvFrame);
-				imshow("Binary image", threshold);
+				//imshow("YCrCb image", ycrcbFrame);
+				imshow("Binary image YCrCb", thresholdYCrCb);
+				imshow("Binary image HSV", thresholdHSV);
 				//imshow("Gray image", gray);
+				
+				imshow("Binary AND", andFUCK);
 			}
 			catch (cv::Exception & e)
 			{
