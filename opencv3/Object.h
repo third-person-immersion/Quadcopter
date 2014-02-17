@@ -28,15 +28,26 @@ public:
 	void decPrio(double prio);
 	void setPrio(double prio);
 
-	bool getHasCircle();
-	void setHasCircle(bool value);
+	bool getMatches();
+	void incMatches();
 
+    bool getAdded();
+    void setAdded(bool value);
+
+    double getXDist();
+    void setXDist(double dist);
+    
+    double getYDist();
+    void setYDist(double dist);
+    
+    double getZDist();
+    void setZDist(double dist);
 
 private:
 
-	double xPos, yPos, area, radius, prio;
+	double xPos, yPos, area, radius, prio, matches, xDist, yDist, zDist;
 	string type;
-	bool hasCircle;
+	bool added;
 
 };
 

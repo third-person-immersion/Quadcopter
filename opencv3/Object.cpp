@@ -1,8 +1,10 @@
-//#include "stdafx.h"
 #include "Object.h"
 
 Object::Object(void)
 {
+    Object::prio = 0.0;
+    Object::matches = 0;
+    Object::added = false;
 }
 
 
@@ -86,10 +88,40 @@ void Object::setPrio(double prio){
 	Object::prio = prio;
 }
 
-bool Object::getHasCircle(){
-	return Object::hasCircle;
+bool Object::getMatches(){
+    return Object::matches;
 }
 
-void Object::setHasCircle(bool value){
-	Object::hasCircle = value;
+void Object::incMatches(){
+    Object::matches++;
+}
+
+
+bool Object::getAdded(){
+    return Object::added;
+}
+   
+void Object::setAdded(bool value){
+    Object::added = value;
+}
+
+double Object::getXDist(){
+    return Object::xDist;
+}
+void Object::setXDist(double dist){
+    Object::xDist = dist;
+}
+    
+double Object::getYDist(){
+    return Object::yDist;
+}
+void Object::setYDist(double dist){
+    Object::yDist = dist;
+}
+    
+double Object::getZDist(){
+    return Object::zDist;
+}
+void Object::setZDist(double dist){
+    Object::zDist = dist;
 }
