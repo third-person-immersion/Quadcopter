@@ -28,7 +28,7 @@ public:
 	void decPrio(double prio);
 	void setPrio(double prio);
 
-	bool getMatches();
+	int getMatches();
 	void incMatches();
 
     bool getAdded();
@@ -45,7 +45,8 @@ public:
 
 private:
 
-	double xPos, yPos, area, radius, prio, matches, xDist, yDist, zDist;
+	double xPos, yPos, area, radius, prio,  xDist, yDist, zDist;
+   int matches;
 	string type;
 	bool added;
 

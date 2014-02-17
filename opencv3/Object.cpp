@@ -88,7 +88,7 @@ void Object::setPrio(double prio){
 	Object::prio = prio;
 }
 
-bool Object::getMatches(){
+int Object::getMatches(){
     return Object::matches;
 }
 
