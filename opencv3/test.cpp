@@ -428,7 +428,35 @@ void trackObjects(Mat &thresholdYCrCb, Mat &thresholdHSV, Mat &gray) {
 
 int main(int argc, char** argv)
 {
-    VideoCapture cam(0);
+    int c;
+    int debugMode = 0;
+    int camInput = 0;
+    while ( (c = getopt(argc, argv, "c:d")) != -1) {
+        switch (c) {
+            case 'c':
+            camInput = atoi(optarg);
+            break;
+            case 'd':
+            debugMode = 1;
+            break;
+            case '?':
+            break;
+            default:
+            printf ("?? getopt returned character code 0%o ??\n", c);
+        }
+    }
+    if (optind < argc) {
+        printf ("non-option ARGV-elements: ");
+        while (optind < argc)
+            printf ("%s ", argv[optind++]);
+        printf ("\n");
+    }
+
+    if (debugMode){
+        cout << "debugMode is on\n";
+    }
+    VideoCapture cam(camInput);
+    
     //Sleep(1000);
 
     if (!cam.isOpened()) {
