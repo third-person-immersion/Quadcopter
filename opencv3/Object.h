@@ -31,6 +31,9 @@ public:
 	int getMatches();
 	void incMatches();
 
+	int getMatchesPair();
+	void incMatchesPair();
+
     bool getAdded();
     void setAdded(bool value);
 
@@ -43,12 +46,15 @@ public:
     double getZDist();
     void setZDist(double dist);
 
+    bool getChecked();
+    void setChecked(bool value);
+
 private:
 
 	double xPos, yPos, area, radius, prio,  xDist, yDist, zDist;
-   int matches;
+    int matches, matchesPair;
 	string type;
-	bool added;
+	bool added, checked;
 
 };
 

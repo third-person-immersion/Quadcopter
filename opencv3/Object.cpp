@@ -4,7 +4,9 @@ Object::Object(void)
 {
     Object::prio = 0.0;
     Object::matches = 0;
+    Object::matchesPair = 0;
     Object::added = false;
+    Object::checked = false;
 }
 
 
@@ -96,6 +98,14 @@ void Object::incMatches(){
     Object::matches++;
 }
 
+int Object::getMatchesPair(){
+    return Object::matchesPair;
+}
+
+void Object::incMatchesPair(){
+    Object::matchesPair++;
+}
+
 
 bool Object::getAdded(){
     return Object::added;
@@ -124,4 +134,12 @@ double Object::getZDist(){
 }
 void Object::setZDist(double dist){
     Object::zDist = dist;
+}
+
+bool Object::getChecked(){
+    return Object::checked;
+}
+   
+void Object::setChecked(bool value){
+    Object::checked = value;
 }

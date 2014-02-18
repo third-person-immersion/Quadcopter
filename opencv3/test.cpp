@@ -214,6 +214,15 @@ vector<Object> findObjects(Mat &frame){
     return objects;
 }
 
+bool checkRadiusRatio(Object &a, Object &b, double ratio)
+{
+    if(a.getRadius() > b.getRadius())
+    {
+        return a.getRadius()/b.getRadius() <= ratio;
+    }
+    return b.getRadius()/a.getRadius() <= ratio;
+}
+
 void matchObjects(vector<Object> &first, vector<Object> &second, vector<Object> &result)
 {
     for(int i = 0; i < first.size(); ++i)
@@ -222,12 +231,13 @@ void matchObjects(vector<Object> &first, vector<Object> &second, vector<Object> 
         {
             //Check if the radius and position of the circles and the filtered objects match
             if(first.at(i).getXPos() - first.at(i).getRadius()/2 <= second.at(j).getXPos() && second.at(j).getXPos() <= first.at(i).getXPos() + first.at(i).getRadius()/2 &&
-                first.at(i).getYPos() - first.at(i).getRadius()/2 <= second.at(j).getYPos() && second.at(j).getYPos() <= first.at(i).getYPos() + first.at(i).getRadius()/2)
+                first.at(i).getYPos() - first.at(i).getRadius()/2 <= second.at(j).getYPos() && second.at(j).getYPos() <= first.at(i).getYPos() + first.at(i).getRadius()/2 &&
+                checkRadiusRatio(first.at(i), second.at(j), 1.5))
             {
                 //We have matching circles/filtered obejcts
                 //set the prio for the filtered objects
-                first.at(i).incPrio(abs(2/distanceFUCK(first.at(i), second.at(j))));
-                first.at(i).incPrio(2/radiusDiff(first.at(i), second.at(j)));
+                first.at(i).incPrio(10);//abs(2/distanceFUCK(first.at(i), second.at(j))));
+                first.at(i).incPrio(10);//2/radiusDiff(first.at(i), second.at(j)));
                 //inc that there is a match
                 first.at(i).incMatches();
                 second.at(j).incMatches();
@@ -254,10 +264,10 @@ void printPrio()
         ss << both.at(i).getPrio();
         cv::putText(frameColor, ss.str(), cv::Point(both.at(i).getXPos(), both.at(i).getYPos()-40), 1, 1, cv::Scalar(0, 0, 170), 2);
 
-        if(i <= 3)
+        if(i < 3 && both.size() >= 3)
         {
             int j = (i+1)%3;
-            cv::line(frameColor, cv::Point(both.at(i).getXPos(), both.at(i).getYPos()), cv::Point(both.at(j).getXPos(), both.at(j).getYPos()),cv::Scalar(0, 0, 255));
+            cv::line(frameColor, cv::Point(both.at(i).getXPos(), both.at(i).getYPos()), cv::Point(both.at(j).getXPos(), both.at(j).getYPos()),cv::Scalar(0, 0, 255), 1);
             cv::circle(frameColor, cv::Point(both.at(i).getXPos(), both.at(i).getYPos()), both.at(i).getRadius(), cv::Scalar(0, 0, 255));
         }
     }
@@ -284,6 +294,47 @@ double distance3D(Object a, Object b)
     return sqrt(pow(a.getXDist() - b.getXDist(), 2.0) + pow(a.getYDist() - b.getYDist(), 2.0) + pow(a.getZDist() - b.getZDist(), 2.0));
 }
 
+void createPairsByDistance(vector<Object> &objects, vector< vector<int> > &neighborhood)
+{
+    double distance;
+    for(int i = 0; i < objects.size(); ++i)
+    {
+        vector<int> neighbors;
+        for(int j = 0; j < objects.size(); ++j)
+        {
+            distance = distance3D(objects.at(i), objects.at(j));
+            if(MIN_DISTANCE_BETWEEN_CIRCLES <= distance && distance <= MAX_DISTANCE_BETWEEN_CIRCLES)
+            {
+                neighbors.push_back(j);
+                //Här ritas avståndslinjer ut
+                cv::line(frameColor, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), cv::Point(objects.at(j).getXPos(), objects.at(j).getYPos()),cv::Scalar(255, 255, 0), 3);
+            }
+
+        }
+        neighborhood.push_back(neighbors);
+    }
+}
+
+
+void matchTriangles(vector< vector<int> > &neighborhood)
+{
+    for(int resident = 0; resident < neighborhood.size(); ++resident)
+    {
+        for(int neighbor = 0; neighbor < neighborhood.at(resident).size(); ++neighbor)
+        {
+            if(std::find(neighborhood.at(neighbor).begin(), neighborhood.at(neighbor).end(), resident) != neighborhood.at(neighbor).end() &&
+                !both.at(resident).getChecked())
+            {
+                both.at(resident).setChecked(true);
+                both.at(resident).incPrio(10);
+            }
+        }
+        
+    }
+}
+
+
+
 void trackObjects(Mat &thresholdYCrCb, Mat &thresholdHSV, Mat &gray) {
     both.clear();
     
@@ -304,11 +355,14 @@ void trackObjects(Mat &thresholdYCrCb, Mat &thresholdHSV, Mat &gray) {
     vector<Object> circlesYCrCb;
     vector<Object> circlesHSV;
 
+    vector< vector<int> > neighborhood;
+
     
 
     //Get objects from frame
     circlesYCrCb = findObjects(tempFindYCrCb);
     circlesHSV = findObjects(tempFindHSV);
+
     
     // Apply the Hough Transform to find the circles in the frame
     //HoughCircles(tempHoughYCrCb, circlesHoughYCrCb, CV_HOUGH_GRADIENT, 1, 80, cP1, cP2, 0, maxHoughRadius);
@@ -333,8 +387,6 @@ void trackObjects(Mat &thresholdYCrCb, Mat &thresholdHSV, Mat &gray) {
         both.at(i).setYDist( (ballRadius / both.at(i).getRadius()) * (both.at(i).getYPos() - frameColor.rows/2) );
         both.at(i).setZDist( ballRadius * frameColor.cols / (2*both.at(i).getRadius()*tan(FOV * PI/360)) );
 
-
-
         //Print the distance
         stringstream ss;
         ss << both.at(i).getZDist();
@@ -345,31 +397,10 @@ void trackObjects(Mat &thresholdYCrCb, Mat &thresholdHSV, Mat &gray) {
 
     }
 
-    vector< vector<Object> > pairs;
-
-
-    //Problem: The pairs will be checked twice, prease fix chicken and a cow
-    double distance;
-    for(int i = 0; i < both.size(); ++i)
-    {
-        for(int j = 0; j < both.size(); ++j)
-        {
-            distance = distance3D(both.at(i), both.at(j));
-            if(distance <= MAX_DISTANCE_BETWEEN_CIRCLES && distance >= MIN_DISTANCE_BETWEEN_CIRCLES)
-            {
-                vector<Object> pair;
-                pair.push_back(both.at(i));
-                pair.push_back(both.at(j));
-                pairs.push_back(pair);
-
-                both.at(i).incPrio(10);
-                both.at(j).incPrio(10);
-                
-                //cv::line(frameColor, cv::Point(both.at(i).getXPos(), both.at(i).getYPos()), cv::Point(both.at(j).getXPos(), both.at(j).getYPos()),cv::Scalar(255, 0, 255), 2);
-            }
-
-        }
-    }
+    //Create pairs
+    createPairsByDistance(both, neighborhood);
+    
+    matchTriangles(neighborhood);
 
     
     //Sort the "both" vector with the highest prio first
@@ -462,6 +493,7 @@ int main(int argc, char** argv)
     
     //Sleep(1000);
 
+
     if (!cam.isOpened()) {
         cout << "Error loading camera";
     }
@@ -498,78 +530,15 @@ int main(int argc, char** argv)
     cP2 = 20;
     ERODE = 1;
     DILATE = 1;
-
-    /* Microsoft webcam */
-    /*CERIST PAPPER, hemma hos jacob, YCbCr 
-    H_MIN = 68;
-    H_MAX = 147;
-    S_MIN = 121;
-    S_MAX = 195;
-    V_MIN = 0;
-    V_MAX = 256;
-    MINAREA = 370;
-    cP1 = 300;
-    cP2 = 15;
-    ERODE = 1;
-    DILATE = 1; //7*/
-
-    /* Microsoft webcam */
-    /*CERIST PAPPER
-    H_MIN = 112;
-    H_MAX = 195;
-    S_MIN = 128;
-    S_MAX = 196;
-    V_MIN = 154;
-    V_MAX = 254;
-    MINAREA = 370;
-    cP1 = 300;
-    ERODE = 3;
-    DILATE = 4; //7*/
     
-    
-    /* inbyggd kamera
-    H_MIN = 35;
-    H_MAX = 68;
-    S_MIN = 98;
-    S_MAX = 170;
-    V_MIN = 63;
-    V_MAX = 256;
-    MINAREA = 300;
-    ERODE = 1;
-    DILATE = 5;
-    */
-    /* inbyggd kamera pingisboll
-    H_MIN = 32;
-    H_MAX = 89;
-    S_MIN = 70;
-    S_MAX = 189;
-    V_MIN = 86;
-    V_MAX = 256;
-    MINAREA = 3000;
-    ERODE = 4;
-    DILATE = 5;
-    */
-    /* inbyggd kamera tennisboll
-    
-    H_MIN = 68;
-    H_MAX = 98;
-    S_MIN = 46;
-    S_MAX = 158;
-    V_MIN = 82;
-    V_MAX = 256;
-    MINAREA = 1500;
-    ERODE = 4;
-    DILATE = 5;*/
-    
-    
+    //Create the trackbars for both colors
     createTrackbars(1, "Y_MIN", "Y_MAX", "Cr_MIN", "Cr_MAX", "Cb_MIN", "Cb_MAX", &Y_MIN, &Y_MAX, &Cr_MIN, &Cr_MAX, &Cb_MIN, &Cb_MAX);
     createTrackbars(2, "H_MIN", "H_MAX", "S_MIN", "S_MAX", "V_MIN", "V_MAX", &H_MIN, &H_MAX, &S_MIN, &S_MAX, &V_MIN, &V_MAX);
 
     //Sleep(1000);
     
+    //Force the image to be at 1280x720 _IF_ the camera supports it, otherwise it will be the cameras maximum res
     CvCapture* capture = cvCreateCameraCapture(0);
-
-
     cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 720);
     cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 1280);
 
