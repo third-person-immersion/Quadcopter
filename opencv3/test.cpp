@@ -20,6 +20,7 @@ using namespace std;
 int MAX_DISTANCE_BETWEEN_CIRCLES = 30;
 int MIN_DISTANCE_BETWEEN_CIRCLES = 10;
 int MINAREA = 2000;
+int MAXAREA = 2000;
 int ERODE = 30;
 int DILATE = 60;
 int Y_MIN = 0;
@@ -53,7 +54,7 @@ double ballRadius = 3.2;
 //inbyggd
 //int FOV = 66;
 //Microsoft webcam
-int FOV = 70;//73; <-- 73 är mer rätt, men bättre med 70 då 73 är för diagonalen
+int FOV = 66;//73; <-- 73 är mer rätt, men bättre med 70 då 73 är för diagonalen
 
 vector<Object> both;
 
@@ -98,11 +99,13 @@ void createTrackbars(int number, char* min1, char* max1, char* min2, char* max2,
     sprintf_s(TrackbarName, min3, minInt3);
     sprintf_s(TrackbarName, max3, maxInt3);
     sprintf_s(TrackbarName, "MINAREA", MINAREA);
+    sprintf_s(TrackbarName, "MAXAREA", MAXAREA);
     sprintf_s(TrackbarName, "ERODE", ERODE);
     sprintf_s(TrackbarName, "DILATE", DILATE);
     sprintf_s(TrackbarName, "CIRCLE_PARAM_1", cP1);
     sprintf_s(TrackbarName, "CIRCLE_PARAM_2", cP2);
     sprintf_s(TrackbarName, "CIRCLE_RADIUS", maxHoughRadius);
+    sprintf_s(TrackbarName, "FOV", 100);
     //create trackbars and insert them into window
     //3 parameters are: the address of the variable that is changing when the trackbar is moved(eg.H_LOW),
     //the max value the trackbar can move (eg. H_HIGH), 
@@ -115,11 +118,13 @@ void createTrackbars(int number, char* min1, char* max1, char* min2, char* max2,
     createTrackbar(min3, trackbarWindowName, minInt3, 256, on_trackbar);
     createTrackbar(max3, trackbarWindowName, maxInt3, 256, on_trackbar);
     createTrackbar("MINAREA", trackbarWindowName, &MINAREA, 3000, on_trackbar );
+    createTrackbar("MAXAREA", trackbarWindowName, &MAXAREA, 10000, on_trackbar );
     createTrackbar("ERODE", trackbarWindowName, &ERODE, 20, on_trackbar);
     createTrackbar("DILATE", trackbarWindowName, &DILATE, 20, on_trackbar);
     createTrackbar("CIRCLE_PARAM_1", trackbarWindowName, &cP1, 500, on_trackbar);
     createTrackbar("CIRCLE_PARAM_2", trackbarWindowName, &cP2, 100, on_trackbar);
     createTrackbar("CIRCLE_RADIUS", trackbarWindowName, &maxHoughRadius, 250, on_trackbar);
+    createTrackbar("FOV", trackbarWindowName, &FOV, 100, on_trackbar);
 }
 
 void morphOps(Mat &thresh){
@@ -195,7 +200,7 @@ vector<Object> findObjects(Mat &frame){
             double moment01 = mom.m01;
             double area = mom.m00;
 
-            if (area > MINAREA) {
+            if (area >= MINAREA && area <= MAXAREA) {
                 posX = moment10 / area;
                 posY = moment01 / area;
 
@@ -307,7 +312,7 @@ void createPairsByDistance(vector<Object> &objects, vector< vector<int> > &neigh
             {
                 neighbors.push_back(j);
                 //Här ritas avståndslinjer ut
-                cv::line(frameColor, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), cv::Point(objects.at(j).getXPos(), objects.at(j).getYPos()),cv::Scalar(255, 255, 0), 3);
+                //cv::line(frameColor, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), cv::Point(objects.at(j).getXPos(), objects.at(j).getYPos()),cv::Scalar(255, 255, 0), 3);
             }
 
         }
@@ -390,10 +395,10 @@ void trackObjects(Mat &thresholdYCrCb, Mat &thresholdHSV, Mat &gray) {
         //Print the distance
         stringstream ss;
         ss << both.at(i).getZDist();
-        cv::putText(frameColor, ss.str(), cv::Point(both.at(i).getXPos(), both.at(i).getYPos()), 2, 0.5, cv::Scalar(0,100,0));
-        stringstream ss2;
-        ss2 << both.at(i).getRadius();
-        cv::putText(frameColor, ss2.str(), cv::Point(both.at(i).getXPos(), both.at(i).getYPos()+40), 1, 1, cv::Scalar(0,255,0));
+        cv::putText(frameColor, ss.str(), cv::Point(both.at(i).getXPos(), both.at(i).getYPos()-20), 2, 0.5, cv::Scalar(0,180,180), 2);
+        //stringstream ss2;
+        //ss2 << both.at(i).getRadius();
+        //cv::putText(frameColor, ss2.str(), cv::Point(both.at(i).getXPos(), both.at(i).getYPos()+40), 1, 1, cv::Scalar(0,255,0));
 
     }
 
@@ -462,7 +467,7 @@ void trackObjects(Mat &thresholdYCrCb, Mat &thresholdHSV, Mat &gray) {
 
 int main(int argc, char** argv)
 {
-    int c;
+	int c;
     int debugMode = 0;
     int camInput = 0;
     while ( (c = getopt(argc, argv, "c:d")) != -1) {
@@ -509,27 +514,79 @@ int main(int argc, char** argv)
 
     /** Microsoft webcam
         Blått papper
-        YCbCr färger och HSV färger*/
+        YCbCr färger och HSV färger
     //For YCbCr filtering
     Y_MIN = 0;
     Y_MAX = 256;
-    Cr_MIN = 142;
+    Cr_MIN = 100;//142;
     Cr_MAX = 256;
     Cb_MIN = 0;
-    Cb_MAX = 109;
+    Cb_MAX = 127;//109;
     //For HSV filtering
     H_MIN = 0;
-    H_MAX = 93;
-    S_MIN = 91;
+    H_MAX = 90;
+    S_MIN = 40;//91;
     S_MAX = 256;
     V_MIN = 0;
     V_MAX = 256;
     //Same for both color filters
-    MINAREA = 750;
+    MINAREA = 300;
+    MAXAREA = 10000;
+    cP1 = 300;
+    cP2 = 20;
+    ERODE = 1;
+    DILATE = 2; */
+
+    /** Microsoft webcam
+        Cerist papper
+        YCbCr färger och HSV färger */
+    //For YCbCr filtering
+    Y_MIN = 0;
+    Y_MAX = 256;
+    Cr_MIN = 110;
+    Cr_MAX = 256;
+    Cb_MIN = 150;
+    Cb_MAX = 256;
+    //For HSV filtering
+    H_MIN = 105;
+    H_MAX = 256;
+    S_MIN = 33;
+    S_MAX = 256;
+    V_MIN = 0;
+    V_MAX = 256;
+    //Same for both color filters
+    MINAREA = 300;
+    MAXAREA = 10000;
     cP1 = 300;
     cP2 = 20;
     ERODE = 1;
     DILATE = 1;
+
+
+    /** Microsoft webcam
+        Tennisbollar
+        YCbCr färger och HSV färger
+    //For YCbCr filtering
+    Y_MIN = 0;
+    Y_MAX = 256;
+    Cr_MIN = 68;
+    Cr_MAX = 124;
+    Cb_MIN = 132;
+    Cb_MAX = 226;
+    //For HSV filtering
+    H_MIN = 58;
+    H_MAX = 256;
+    S_MIN = 74;
+    S_MAX = 195;
+    V_MIN = 0;
+    V_MAX = 256;
+    //Same for both color filters
+    MINAREA = 300;
+    MAXAREA = 1500;
+    cP1 = 195;
+    cP2 = 20;
+    ERODE = 1;
+    DILATE = 1; */
     
     //Create the trackbars for both colors
     createTrackbars(1, "Y_MIN", "Y_MAX", "Cr_MIN", "Cr_MAX", "Cb_MIN", "Cb_MAX", &Y_MIN, &Y_MAX, &Cr_MIN, &Cr_MAX, &Cb_MIN, &Cb_MAX);
