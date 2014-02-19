@@ -8,6 +8,9 @@
 #include <iostream>
 #include <windows.h>
 #include "Frame.h"
+#include <getopt.h>
+#include <stdio.h>
+#include <unistd.h>
 #include "Object.h"
 #define PI 3.14159265
 
