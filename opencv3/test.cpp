@@ -692,7 +692,7 @@ int main(int argc, char** argv)
                 cout << e.what() << endl;
             }
         }
-        if (waitKey(30) >= 0) break;
+        if (waitKey(30) == 'q') break;
     }
 
     return 0;
