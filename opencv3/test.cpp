@@ -40,7 +40,7 @@ int cP2 = 30; //cerist papper
 int maxHoughRadius = 80;
 
 //The radius of the current ball used
-double ballRadius = 7.5/2;
+double ballRadius = 3.2;//7.5/2;
 //The Field Of View of the camera used at the moment
 //Microsoft webcam
 int FOV = 48;//66;
@@ -134,6 +134,15 @@ void morphOps(Mat &thresh){
 
 
 
+}
+
+double pix2Dist(double pix, double objRadius, double ballRadius)
+{
+    return pix * ballRadius/objRadius;
+}
+double dist2Pix(double dist, double objRadius, double ballRadius)
+{
+    return dist * objRadius/ballRadius;
 }
 
 bool sorting(Object obj1, Object obj2)
@@ -247,21 +256,9 @@ void matchObjects(vector<Object> &first, vector<Object> &second, vector<Object> 
     }
 }
 
-void printPrio(vector<Object> &objects, vector<Object> &circles, vector<Object> &hsv, vector<Object> &ycrcb, Mat &frame)
+void printPrio(vector<Object> &objects, Mat &frame)
 {
-    for(int i = 0; i<circles.size(); ++i)
-    {
-        circle(frame, Point(circles.at(i).getXPos(), circles.at(i).getYPos()), circles.at(i).getRadius(), Scalar(255,255,0), 2);
-    }
-    /*for(int i = 0; i<hsv.size(); ++i)
-    {
-        circle(frame, Point(hsv.at(i).getXPos(), hsv.at(i).getYPos()), hsv.at(i).getRadius(), Scalar(255,0,255));
-    }
-    for(int i = 0; i<ycrcb.size(); ++i)
-    {
-        circle(frame, Point(ycrcb.at(i).getXPos(), ycrcb.at(i).getYPos()), ycrcb.at(i).getRadius(), Scalar(0,255,255));
-    }*/
-    int avgDistance = 0;
+    //int avgDistance = 0;
     for(int i = 0; i < objects.size(); ++i)
     {
         //Print out the prio on every circle (both circles and filtered)
@@ -271,23 +268,21 @@ void printPrio(vector<Object> &objects, vector<Object> &circles, vector<Object> 
 
         if(i < 3 && objects.size() >= 3)
         {
-            avgDistance += objects.at(i).getZDist();
+            //avgDistance += objects.at(i).getZDist();
             int j = (i+1)%3;
             cv::line(frame, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), cv::Point(objects.at(j).getXPos(), objects.at(j).getYPos()),cv::Scalar(0, 0, 255), 1);
             cv::circle(frame, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), objects.at(i).getRadius(), cv::Scalar(0, 0, 255));
         }
     }
+    /*
     if(objects.size() >= 3)
     {
         avgDistance /= 3;
         stringstream ss2;
-        ss2 << avgDistance;
+        ss2 << avgDistance << " cm :D";
         cv::putText(frame, ss2.str(), cv::Point(50, 50), 1, 3, cv::Scalar(0, 255, 255), 3);
     }
-    
-
-
-    
+    */
 }
 
 void circleToObject(vector<Vec3f> &circles, vector<Object> &result)
@@ -372,7 +367,7 @@ void trackObjects(Mat &thresholdYCrCb, Mat &thresholdHSV, Mat &gray, vector<Obje
 }
 
 /**Calculate the 3D position for all objects in the given list */
-void calculate3DPosition(vector<Object> &objects, Mat &frame, int ballRadius, int FOV)
+void calculate3DPosition(vector<Object> &objects, Mat &frame, double ballRadius, int FOV)
 {
 	for(int i=0; i<objects.size(); i++){
         
@@ -392,50 +387,62 @@ void calculate3DPosition(vector<Object> &objects, Mat &frame, int ballRadius, in
 }
 
 /** Calculatess and prints a normal to the found objects (a coordinate system) */
-void printNormal(vector<Object> &objects, Mat &frame, int ballRadius, int FOV)
+void printNormal(vector<Object> &objects, Mat &frame, double ballRadius, int FOV)
 {
-	if(objects.size()>=3){
-        double position[3][3];
-        for(int i=0; i<3; i++){
-            position[i][0] = (frame.cols - objects.at(i).getXPos()) * ballRadius/objects.at(i).getRadius();
-            position[i][1] = (frame.rows - objects.at(i).getYPos()) * ballRadius/objects.at(i).getRadius();
-            position[i][2] = ballRadius * frame.rows / (2*objects.at(i).getRadius()*tan(FOV * PI/360));
-        }
-        
+    if(objects.size()>=3)
+    {
         double vect1[3];
         double vect2[3];
         double vect3[3];
-
-        double lineLength = 40;
+        double midPos[3];
+        double lineLength = 20;
         
+        vect1[0] = objects.at(0).getXDist() - objects.at(1).getXDist();
+        vect1[1] = objects.at(0).getYDist() - objects.at(1).getYDist();
+        vect1[2] = objects.at(0).getZDist() - objects.at(1).getZDist();
+
+        midPos[0] = objects.at(0).getXDist() - vect1[0]/3;
+        midPos[1] = objects.at(0).getYDist() - vect1[1]/3;
+        midPos[2] = objects.at(0).getZDist() - vect1[2]/3;
+
+        double length = sqrt(pow(vect1[0], 2) + pow(vect1[1], 2) + pow(vect1[2], 2));
         for(int i=0; i<3; i++){
-            vect1[i] = (position[0][i] - position[1][i]);
+            vect1[i] = vect1[i]/length;
         }
-        double length = sqrt(vect1[0]*vect1[0] + vect1[1]*vect1[1] + vect1[2]*vect1[2]);
+        vect2[0] = objects.at(0).getXDist() - objects.at(2).getXDist();
+        vect2[1] = objects.at(0).getYDist() - objects.at(2).getYDist();
+        vect2[2] = objects.at(0).getZDist() - objects.at(2).getZDist();
+
+        midPos[0] -= vect2[0]/3;
+        midPos[1] -= vect2[1]/3;
+        midPos[2] -= vect2[2]/3;
+
+        length = sqrt(pow(vect2[0], 2) + pow(vect2[1], 2) + pow(vect2[2], 2));
         for(int i=0; i<3; i++){
-            vect1[i] = lineLength * vect1[i]/length;
+            vect2[i] = vect2[i]/length;
         }
-        for(int i=0; i<3; i++){
-            vect2[i] = (position[0][i] - position[2][i]);
-        }
-        length = sqrt(vect2[0]*vect2[0] + vect2[1]*vect2[1] + vect2[2]*vect2[2]);
-        for(int i=0; i<3; i++){
-            vect2[i] = lineLength * vect2[i]/length;
-        }
+
+        //crossproduct
         vect3[0] = (vect1[1]*vect2[2] - vect1[2]*vect2[1]);
         vect3[1] = (vect1[2]*vect2[0] - vect1[0]*vect2[2]);
         vect3[2] = (vect1[0]*vect2[1] - vect1[1]*vect2[0]);
-        length = sqrt(vect3[0]*vect3[0] + vect3[1]*vect3[1] + vect3[2]*vect3[2]);
+        //Gör en overload på distance3D
+        length = sqrt(pow(vect3[0], 2) + pow(vect3[1], 2) + pow(vect3[2], 2));
         for(int i=0; i<3; i++){
-            vect3[i] = lineLength * vect3[i]/length;
+            vect3[i] = vect3[i]/length;
         }
-        double w = objects.at(0).getXPos();
-        double h = objects.at(0).getYPos();
+
+        double startX = frame.cols/2 + dist2Pix(midPos[0], objects.at(0).getRadius(), ballRadius);
+        double startY = frame.rows/2 + dist2Pix(midPos[1], objects.at(0).getRadius(), ballRadius);
 
         //Print
-        cv::line(frame, cv::Point(w, h),cv::Point(w + vect1[0], h + vect1[1]),cv::Scalar(255,0,0), 3);
-        cv::line(frame, cv::Point(w, h),cv::Point(w + vect2[0], h + vect2[1]),cv::Scalar(0,255,0), 3);
-        cv::line(frame, cv::Point(w, h),cv::Point(w + vect3[0], h + vect3[1]),cv::Scalar(0,0,255), 3);
+        cv::line(frame, cv::Point(startX, startY),cv::Point(startX + lineLength*(vect1[0], objects.at(0).getRadius(), ballRadius), startY + lineLength*dist2Pix(vect1[1], objects.at(0).getRadius(), ballRadius)),cv::Scalar(255,0,0), 3);
+        cv::line(frame, cv::Point(startX, startY),cv::Point(startX + lineLength*dist2Pix(vect2[0], objects.at(0).getRadius(), ballRadius), startY + lineLength*dist2Pix(vect2[1], objects.at(0).getRadius(), ballRadius)),cv::Scalar(0,255,0), 3);
+        cv::line(frame, cv::Point(startX, startY),cv::Point(startX + lineLength*dist2Pix(vect3[0], objects.at(0).getRadius(), ballRadius), startY + lineLength*dist2Pix(vect3[1], objects.at(0).getRadius(), ballRadius)),cv::Scalar(0,0,255), 3);
+        
+        stringstream ss2;
+        ss2 << "Dist to mid: " << midPos[2] << " cm :D";
+        cv::putText(frame, ss2.str(), cv::Point(50, 50), 1, 2.5, cv::Scalar(0, 255, 255), 3);
     }
 }
 
@@ -585,6 +592,14 @@ int main(int argc, char** argv)
     cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 720);
     cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 1280);
 
+    if(debugMode >= 1)
+    {
+        cout << "Starting to capture!\n";
+        cout << "Ball radius set to: " << ballRadius << "\n";
+    }
+    
+
+
     while (1) {
         //Clear from old loop
         both.clear();
@@ -649,7 +664,19 @@ int main(int argc, char** argv)
 				//If in debug mode, print the prio to the screen
 				if(debugMode >= 1)
 				{
-                    printPrio(both, trackedCircles, trackedHSV, trackedYCrCb, frameColor);
+                    for(int i = 0; i<trackedCircles.size(); ++i)
+                    {
+                        circle(frameColor, Point(trackedCircles.at(i).getXPos(), trackedCircles.at(i).getYPos()), trackedCircles.at(i).getRadius(), Scalar(255,255,0), 2);
+                    }
+                    /*for(int i = 0; i<trackedHSV.size(); ++i)
+                    {
+                        circle(trackedHSV, Point(trackedHSV.at(i).getXPos(), trackedHSV.at(i).getYPos()), trackedHSV.at(i).getRadius(), Scalar(255,0,255));
+                    }
+                    for(int i = 0; i<trackedYCrCb.size(); ++i)
+                    {
+                        circle(frameColor, Point(trackedYCrCb.at(i).getXPos(), trackedYCrCb.at(i).getYPos()), trackedYCrCb.at(i).getRadius(), Scalar(0,255,255));
+                    }*/
+                    printPrio(both, frameColor);
 					printNormal(both, frameColor, ballRadius, FOV);
 				}
 
