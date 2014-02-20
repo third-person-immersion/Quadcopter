@@ -6,7 +6,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <iostream>
-#include <windows.h>
+//#include <windows.h>
 #include "Frame.h"
 //#include <Getopt.h>
 #include <stdio.h>
@@ -79,6 +79,7 @@ void createTrackbars(int number, char* min1, char* max1, char* min2, char* max2,
     namedWindow(trackbarWindowName, 0);
     //create memory to store trackbar name on window
     char TrackbarName[50];
+    /*
     sprintf_s(TrackbarName, min1, minInt1);
     sprintf_s(TrackbarName, max1, maxInt1);
     sprintf_s(TrackbarName, min2, minInt2);
@@ -93,6 +94,7 @@ void createTrackbars(int number, char* min1, char* max1, char* min2, char* max2,
     sprintf_s(TrackbarName, "CIRCLE_PARAM_2", cP2);
     sprintf_s(TrackbarName, "CIRCLE_RADIUS", maxHoughRadius);
     sprintf_s(TrackbarName, "FOV", 100);
+    */
     //create trackbars and insert them into window
     //3 parameters are: the address of the variable that is changing when the trackbar is moved(eg.H_LOW),
     //the max value the trackbar can move (eg. H_HIGH), 
