@@ -8,9 +8,9 @@
 #include <iostream>
 #include <windows.h>
 #include "Frame.h"
-#include <getopt.h>
+//#include <Getopt.h>
 #include <stdio.h>
-#include <unistd.h>
+//#include <unistd.h>
 #include "Object.h"
 #define PI 3.14159265
 
@@ -20,7 +20,7 @@ using namespace std;
 int MAX_DISTANCE_BETWEEN_CIRCLES = 30;
 int MIN_DISTANCE_BETWEEN_CIRCLES = 10;
 int MINAREA = 2000;
-int MAXAREA = 2000;
+int MAXAREA = 15000;
 int ERODE = 30;
 int DILATE = 60;
 int Y_MIN = 0;
@@ -39,26 +39,13 @@ int cP1 = 400;
 int cP2 = 30; //cerist papper
 int maxHoughRadius = 80;
 
-//Skillnad i höjd (y) mellan två punkter i centimeter (tre punkter i triangel används)
-//double twoPointsYDiff = 8.66;
-//double twoPointsXDiff = 10;
-//pingisboll
-//double ballRadius = 3.8;
-//tennisboll
-//double ballRadius = 6.7;
-//Cerist papper stor
-double ballRadius = 3.2;
-//Cerist papper
-//double ballRadius = 2.35;
-//Ska vara två olika, men just nu testas med diagonalen, i grader
-//inbyggd
-//int FOV = 66;
+//The radius of the current ball used
+double ballRadius = 7.5/2;
+//The Field Of View of the camera used at the moment
 //Microsoft webcam
-int FOV = 66;//73; <-- 73 är mer rätt, men bättre med 70 då 73 är för diagonalen
+int FOV = 48;//66;
 
-vector<Object> both;
 
-Mat frameColor, frameHSV, frameYCrCb;
 
 void on_trackbar(int, void*)
 {//This function gets called whenever a
@@ -118,7 +105,7 @@ void createTrackbars(int number, char* min1, char* max1, char* min2, char* max2,
     createTrackbar(min3, trackbarWindowName, minInt3, 256, on_trackbar);
     createTrackbar(max3, trackbarWindowName, maxInt3, 256, on_trackbar);
     createTrackbar("MINAREA", trackbarWindowName, &MINAREA, 3000, on_trackbar );
-    createTrackbar("MAXAREA", trackbarWindowName, &MAXAREA, 10000, on_trackbar );
+    createTrackbar("MAXAREA", trackbarWindowName, &MAXAREA, 50000, on_trackbar );
     createTrackbar("ERODE", trackbarWindowName, &ERODE, 20, on_trackbar);
     createTrackbar("DILATE", trackbarWindowName, &DILATE, 20, on_trackbar);
     createTrackbar("CIRCLE_PARAM_1", trackbarWindowName, &cP1, 500, on_trackbar);
@@ -260,22 +247,46 @@ void matchObjects(vector<Object> &first, vector<Object> &second, vector<Object> 
     }
 }
 
-void printPrio()
+void printPrio(vector<Object> &objects, vector<Object> &circles, vector<Object> &hsv, vector<Object> &ycrcb, Mat &frame)
 {
-    for(int i = 0; i < both.size(); ++i)
+    for(int i = 0; i<circles.size(); ++i)
+    {
+        circle(frame, Point(circles.at(i).getXPos(), circles.at(i).getYPos()), circles.at(i).getRadius(), Scalar(255,255,0), 2);
+    }
+    /*for(int i = 0; i<hsv.size(); ++i)
+    {
+        circle(frame, Point(hsv.at(i).getXPos(), hsv.at(i).getYPos()), hsv.at(i).getRadius(), Scalar(255,0,255));
+    }
+    for(int i = 0; i<ycrcb.size(); ++i)
+    {
+        circle(frame, Point(ycrcb.at(i).getXPos(), ycrcb.at(i).getYPos()), ycrcb.at(i).getRadius(), Scalar(0,255,255));
+    }*/
+    int avgDistance = 0;
+    for(int i = 0; i < objects.size(); ++i)
     {
         //Print out the prio on every circle (both circles and filtered)
         stringstream ss;
-        ss << both.at(i).getPrio();
-        cv::putText(frameColor, ss.str(), cv::Point(both.at(i).getXPos(), both.at(i).getYPos()-40), 1, 1, cv::Scalar(0, 0, 170), 2);
+        ss << objects.at(i).getPrio();
+        cv::putText(frame, ss.str(), cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()-40), 1, 1, cv::Scalar(0, 0, 170), 2);
 
-        if(i < 3 && both.size() >= 3)
+        if(i < 3 && objects.size() >= 3)
         {
+            avgDistance += objects.at(i).getZDist();
             int j = (i+1)%3;
-            cv::line(frameColor, cv::Point(both.at(i).getXPos(), both.at(i).getYPos()), cv::Point(both.at(j).getXPos(), both.at(j).getYPos()),cv::Scalar(0, 0, 255), 1);
-            cv::circle(frameColor, cv::Point(both.at(i).getXPos(), both.at(i).getYPos()), both.at(i).getRadius(), cv::Scalar(0, 0, 255));
+            cv::line(frame, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), cv::Point(objects.at(j).getXPos(), objects.at(j).getYPos()),cv::Scalar(0, 0, 255), 1);
+            cv::circle(frame, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), objects.at(i).getRadius(), cv::Scalar(0, 0, 255));
         }
     }
+    if(objects.size() >= 3)
+    {
+        avgDistance /= 3;
+        stringstream ss2;
+        ss2 << avgDistance;
+        cv::putText(frame, ss2.str(), cv::Point(50, 50), 1, 3, cv::Scalar(0, 255, 255), 3);
+    }
+    
+
+
     
 }
 
@@ -289,7 +300,6 @@ void circleToObject(vector<Vec3f> &circles, vector<Object> &result)
         o.setArea(circles[i][2]*circles[i][2]*PI);
         o.setRadius(circles[i][2]);
         result.push_back(o);
-        cv::circle(frameColor, cv::Point(circles[i][0], circles[i][1]), circles[i][2], cv::Scalar(255, 0, 90), 2);
     }
 }
 
@@ -321,17 +331,17 @@ void createPairsByDistance(vector<Object> &objects, vector< vector<int> > &neigh
 }
 
 
-void matchTriangles(vector< vector<int> > &neighborhood)
+void matchTriangles(vector<Object> &objects, vector< vector<int> > &neighborhood)
 {
     for(int resident = 0; resident < neighborhood.size(); ++resident)
     {
         for(int neighbor = 0; neighbor < neighborhood.at(resident).size(); ++neighbor)
         {
             if(std::find(neighborhood.at(neighbor).begin(), neighborhood.at(neighbor).end(), resident) != neighborhood.at(neighbor).end() &&
-                !both.at(resident).getChecked())
+                !objects.at(resident).getChecked())
             {
-                both.at(resident).setChecked(true);
-                both.at(resident).incPrio(10);
+                objects.at(resident).setChecked(true);
+                objects.at(resident).incPrio(10);
             }
         }
         
@@ -340,87 +350,56 @@ void matchTriangles(vector< vector<int> > &neighborhood)
 
 
 
-void trackObjects(Mat &thresholdYCrCb, Mat &thresholdHSV, Mat &gray) {
-    both.clear();
-    
-    Mat tempFindYCrCb, tempHoughYCrCb;
+void trackObjects(Mat &thresholdYCrCb, Mat &thresholdHSV, Mat &gray, vector<Object> &trackedYCrCb, vector<Object> &trackedHSV, vector<Object> &tackedCircles) {
+    //A temporary Mat of the black&white frames are needed, otherwise the originals will be destroyed
+    Mat tempFindYCrCb, tempHoughYCrCb, tempFindHSV, tempHoughHSV;
     thresholdYCrCb.copyTo(tempFindYCrCb);
     thresholdYCrCb.copyTo(tempHoughYCrCb);
-    Mat tempFindHSV, tempHoughHSV;
     thresholdHSV.copyTo(tempFindHSV);
     thresholdHSV.copyTo(tempHoughHSV);
-
-    //List of objects which came from circle detection
-    vector<Object> circles, bothTemp;
-    //List of circles from circle detection
+    //A temporary list in which the detected circles will be until they are converted into a list of Object
     vector<Vec3f> circlesTemp;
-    vector<Vec3f> circlesHoughYCrCb;
-    vector<Vec3f> circlesHoughHSV;
-    
-    vector<Object> circlesYCrCb;
-    vector<Object> circlesHSV;
-
-    vector< vector<int> > neighborhood;
-
-    
 
     //Get objects from frame
-    circlesYCrCb = findObjects(tempFindYCrCb);
-    circlesHSV = findObjects(tempFindHSV);
+    trackedYCrCb = findObjects(tempFindYCrCb);
+    trackedHSV = findObjects(tempFindHSV);
 
-    
     // Apply the Hough Transform to find the circles in the frame
-    //HoughCircles(tempHoughYCrCb, circlesHoughYCrCb, CV_HOUGH_GRADIENT, 1, 80, cP1, cP2, 0, maxHoughRadius);
-    //HoughCircles(tempHoughYCrCb, circlesHoughHSV,   CV_HOUGH_GRADIENT, 1, 80, cP1, cP2, 0, maxHoughRadius);
-    HoughCircles(gray,           circlesTemp,       CV_HOUGH_GRADIENT, 1, 80, cP1, cP2, 0, maxHoughRadius);
+    HoughCircles(gray, circlesTemp, CV_HOUGH_GRADIENT, 1, 80, cP1, cP2, 0, maxHoughRadius);
 
-
-    //cout << "Found circles: " << circlesTemp.size() << "\n";
-
-        
     //Convert the circles to objects and put them in the "circles" vector
-    circleToObject(circlesTemp, circles);
-    
-    matchObjects(circlesYCrCb, circlesHSV, bothTemp);
-    matchObjects(bothTemp, circles, both);
+    circleToObject(circlesTemp, tackedCircles);
+}
 
-    cout << "\n\nNumber of hits both: " << both.size() << "\n\n";
-    //Calculate the 3D position for all objects
-    for(int i=0; i<both.size(); i++){
+/**Calculate the 3D position for all objects in the given list */
+void calculate3DPosition(vector<Object> &objects, Mat &frame, int ballRadius, int FOV)
+{
+	for(int i=0; i<objects.size(); i++){
         
-        both.at(i).setXDist( (ballRadius / both.at(i).getRadius()) * (both.at(i).getXPos() - frameColor.cols/2) );
-        both.at(i).setYDist( (ballRadius / both.at(i).getRadius()) * (both.at(i).getYPos() - frameColor.rows/2) );
-        both.at(i).setZDist( ballRadius * frameColor.cols / (2*both.at(i).getRadius()*tan(FOV * PI/360)) );
+        objects.at(i).setXDist( (ballRadius / objects.at(i).getRadius()) * (objects.at(i).getXPos() - frame.cols/2) );
+        objects.at(i).setYDist( (ballRadius / objects.at(i).getRadius()) * (objects.at(i).getYPos() - frame.rows/2) );
+        objects.at(i).setZDist( ballRadius * frame.cols / (2*objects.at(i).getRadius()*tan(FOV * PI/360)) );
 
         //Print the distance
         stringstream ss;
-        ss << both.at(i).getZDist();
-        cv::putText(frameColor, ss.str(), cv::Point(both.at(i).getXPos(), both.at(i).getYPos()-20), 2, 0.5, cv::Scalar(0,180,180), 2);
+        ss << objects.at(i).getZDist();
+        cv::putText(frame, ss.str(), cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()-20), 2, 0.5, cv::Scalar(0,180,180), 2);
         //stringstream ss2;
-        //ss2 << both.at(i).getRadius();
-        //cv::putText(frameColor, ss2.str(), cv::Point(both.at(i).getXPos(), both.at(i).getYPos()+40), 1, 1, cv::Scalar(0,255,0));
+        //ss2 << objects.at(i).getRadius();
+        //cv::putText(frame, ss2.str(), cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()+40), 1, 1, cv::Scalar(0,255,0));
 
     }
+}
 
-    //Create pairs
-    createPairsByDistance(both, neighborhood);
-    
-    matchTriangles(neighborhood);
-
-    
-    //Sort the "both" vector with the highest prio first
-    std::sort(both.begin(), both.end(), sorting);
-
-    
-    printPrio();
-
-    //Allt detta är för koordinatsystemet. Ja.
-    if(both.size()>=3){
+/** Calculatess and prints a normal to the found objects (a coordinate system) */
+void printNormal(vector<Object> &objects, Mat &frame, int ballRadius, int FOV)
+{
+	if(objects.size()>=3){
         double position[3][3];
         for(int i=0; i<3; i++){
-            position[i][0] = (frameColor.cols - both.at(i).getXPos()) * ballRadius/both.at(i).getRadius();
-            position[i][1] = (frameColor.rows - both.at(i).getYPos()) * ballRadius/both.at(i).getRadius();
-            position[i][2] = ballRadius * frameColor.rows / (2*both.at(i).getRadius()*tan(FOV * PI/360));
+            position[i][0] = (frame.cols - objects.at(i).getXPos()) * ballRadius/objects.at(i).getRadius();
+            position[i][1] = (frame.rows - objects.at(i).getYPos()) * ballRadius/objects.at(i).getRadius();
+            position[i][2] = ballRadius * frame.rows / (2*objects.at(i).getRadius()*tan(FOV * PI/360));
         }
         
         double vect1[3];
@@ -450,26 +429,22 @@ void trackObjects(Mat &thresholdYCrCb, Mat &thresholdHSV, Mat &gray) {
         for(int i=0; i<3; i++){
             vect3[i] = lineLength * vect3[i]/length;
         }
-        double w = both.at(0).getXPos();
-        double h = both.at(0).getYPos();
+        double w = objects.at(0).getXPos();
+        double h = objects.at(0).getYPos();
 
-        //Koordinatsystemsgrejen (suger)
-        cv::line(frameColor, cv::Point(w, h),cv::Point(w + vect1[0], h + vect1[1]),cv::Scalar(255,0,0), 3);
-        cv::line(frameColor, cv::Point(w, h),cv::Point(w + vect2[0], h + vect2[1]),cv::Scalar(0,255,0), 3);
-        cv::line(frameColor, cv::Point(w, h),cv::Point(w + vect3[0], h + vect3[1]),cv::Scalar(0,0,255), 3);
+        //Print
+        cv::line(frame, cv::Point(w, h),cv::Point(w + vect1[0], h + vect1[1]),cv::Scalar(255,0,0), 3);
+        cv::line(frame, cv::Point(w, h),cv::Point(w + vect2[0], h + vect2[1]),cv::Scalar(0,255,0), 3);
+        cv::line(frame, cv::Point(w, h),cv::Point(w + vect3[0], h + vect3[1]),cv::Scalar(0,0,255), 3);
     }
-
 }
-
-
-
-
 
 int main(int argc, char** argv)
 {
+    
 	int c;
-    int debugMode = 0;
-    int camInput = 0;
+    int debugMode = 1;
+    int camInput = 0;/*
     while ( (c = getopt(argc, argv, "c:d")) != -1) {
         switch (c) {
             case 'c':
@@ -493,9 +468,9 @@ int main(int argc, char** argv)
 
     if (debugMode){
         cout << "debugMode is on\n";
-    }
+    }*/
     VideoCapture cam(camInput);
-    
+
     //Sleep(1000);
 
 
@@ -506,11 +481,22 @@ int main(int argc, char** argv)
         cout << "Camera loaded OK\n\n";
     }
 
-    //svartvita bilden (den filtrerade) för hsv
-    Mat thresholdHSV;
-    Mat thresholdYCrCb;
-    //grayscale image
+    //Colored frames
+    Mat frameColor, frameHSV, frameYCrCb;
+    //Black and white frames
+    Mat thresholdHSV, thresholdYCrCb;
+    //Grayscale frames
     Mat gray;
+	
+	
+	vector<Object> trackedYCrCb;
+    vector<Object> trackedHSV;
+	vector<Object> trackedCircles;
+	
+	vector<Object> both;
+	vector<Object> bothTemp;
+    
+    vector< vector<int> > neighborhood;
 
     /** Microsoft webcam
         Blått papper
@@ -539,7 +525,7 @@ int main(int argc, char** argv)
 
     /** Microsoft webcam
         Cerist papper
-        YCbCr färger och HSV färger */
+        YCbCr färger och HSV färger 
     //For YCbCr filtering
     Y_MIN = 0;
     Y_MAX = 256;
@@ -561,32 +547,32 @@ int main(int argc, char** argv)
     cP2 = 20;
     ERODE = 1;
     DILATE = 1;
-
+    */
 
     /** Microsoft webcam
-        Tennisbollar
-        YCbCr färger och HSV färger
+        cerisa bollar
+        YCbCr färger och HSV färger*/
     //For YCbCr filtering
     Y_MIN = 0;
     Y_MAX = 256;
-    Cr_MIN = 68;
-    Cr_MAX = 124;
-    Cb_MIN = 132;
-    Cb_MAX = 226;
+    Cr_MIN = 98;
+    Cr_MAX = 156;
+    Cb_MIN = 144;
+    Cb_MAX = 256;
     //For HSV filtering
-    H_MIN = 58;
-    H_MAX = 256;
-    S_MIN = 74;
-    S_MAX = 195;
+    H_MIN = 109;
+    H_MAX = 170;
+    S_MIN = 25;
+    S_MAX = 228;
     V_MIN = 0;
     V_MAX = 256;
     //Same for both color filters
     MINAREA = 300;
-    MAXAREA = 1500;
+    MAXAREA = 15000;
     cP1 = 195;
     cP2 = 20;
     ERODE = 1;
-    DILATE = 1; */
+    DILATE = 1; 
     
     //Create the trackbars for both colors
     createTrackbars(1, "Y_MIN", "Y_MAX", "Cr_MIN", "Cr_MAX", "Cb_MIN", "Cb_MAX", &Y_MIN, &Y_MAX, &Cr_MIN, &Cr_MAX, &Cb_MIN, &Cb_MAX);
@@ -600,6 +586,15 @@ int main(int argc, char** argv)
     cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 1280);
 
     while (1) {
+        //Clear from old loop
+        both.clear();
+        bothTemp.clear();
+        trackedYCrCb.clear();
+        trackedHSV.clear();
+        trackedCircles.clear();
+        neighborhood.clear();
+
+        //read the frame from the camera
         cam.read(frameColor);
 
         if (!frameColor.empty()){
@@ -632,13 +627,31 @@ int main(int argc, char** argv)
             morphOps(thresholdHSV);
             try {
 
-                // Tracking    
-                trackObjects(thresholdYCrCb, thresholdHSV, gray);
+                // Tracking objects from the image   
+                trackObjects(thresholdYCrCb, thresholdHSV, gray, trackedYCrCb, trackedHSV, trackedCircles);
                 
-
-                //Canny(gray, gray, cP1/3, cP1);
-                
-                
+				//Match the filtered circles from YCrCb and HSV with eachother and set the prio
+				matchObjects(trackedYCrCb, trackedHSV, bothTemp);
+				matchObjects(bothTemp, trackedCircles, both);
+				
+				//Set the distance for X, Y and Z for all the objects in the both vector
+				calculate3DPosition(both, frameColor, ballRadius, FOV);
+				
+				//Create pairs by their distance
+				createPairsByDistance(both, neighborhood);
+				
+				//Match the pairs into triangles
+				matchTriangles(both, neighborhood);
+				
+				//Sort the "both" vector with the highest prio first
+				std::sort(both.begin(), both.end(), sorting);
+				
+				//If in debug mode, print the prio to the screen
+				if(debugMode >= 1)
+				{
+                    printPrio(both, trackedCircles, trackedHSV, trackedYCrCb, frameColor);
+					printNormal(both, frameColor, ballRadius, FOV);
+				}
 
                 // Display image
                 imshow("Image", frameColor);
