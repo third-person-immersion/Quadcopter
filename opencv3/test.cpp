@@ -304,7 +304,7 @@ double distance3D(Object a, Object b)
     return sqrt(pow(a.getXDist() - b.getXDist(), 2.0) + pow(a.getYDist() - b.getYDist(), 2.0) + pow(a.getZDist() - b.getZDist(), 2.0));
 }
 
-void createPairsByDistance(vector<Object> &objects, vector< vector<int> > &neighborhood)
+void createPairsByDistance(vector<Object> &objects, vector< vector<int> > &neighborhood, Mat &frame)
 {
     double distance;
     for(int i = 0; i < objects.size(); ++i)
@@ -317,7 +317,7 @@ void createPairsByDistance(vector<Object> &objects, vector< vector<int> > &neigh
             {
                 neighbors.push_back(j);
                 //Här ritas avståndslinjer ut
-                //cv::line(frameColor, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), cv::Point(objects.at(j).getXPos(), objects.at(j).getYPos()),cv::Scalar(255, 255, 0), 3);
+                cv::line(frame, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), cv::Point(objects.at(j).getXPos(), objects.at(j).getYPos()),cv::Scalar(255, 255, 0), 3);
             }
 
         }
@@ -328,15 +328,39 @@ void createPairsByDistance(vector<Object> &objects, vector< vector<int> > &neigh
 
 void matchTriangles(vector<Object> &objects, vector< vector<int> > &neighborhood)
 {
+    int maxPrio;
     for(int resident = 0; resident < neighborhood.size(); ++resident)
     {
-        for(int neighbor = 0; neighbor < neighborhood.at(resident).size(); ++neighbor)
+        maxPrio = objects.at(resident).getPrio();
+        for(int neighborIndex = 0; neighborIndex < neighborhood.at(resident).size(); ++neighborIndex)
         {
-            if(std::find(neighborhood.at(neighbor).begin(), neighborhood.at(neighbor).end(), resident) != neighborhood.at(neighbor).end() &&
-                !objects.at(resident).getChecked())
+            int neighbor = neighborhood.at(resident).at(neighborIndex);
+            if(neighbor == resident)
             {
-                objects.at(resident).setChecked(true);
-                objects.at(resident).incPrio(10);
+                continue;
+            }
+            if(maxPrio < objects.at(neighbor).getPrio())
+            {
+                maxPrio = objects.at(neighbor).getPrio();
+            }
+            for(int neighborsNeighborIndex = 0; neighborsNeighborIndex < neighborhood.at(neighborIndex).size(); ++neighborsNeighborIndex)
+            {
+                int neighborsNeighbor = neighborhood.at(neighborIndex).at(neighborsNeighborIndex);
+                if(neighborsNeighbor == neighbor)
+                {
+                    continue;
+                }
+                if(maxPrio < objects.at(neighborsNeighbor).getPrio())
+                {
+                    maxPrio = objects.at(neighborsNeighbor).getPrio();
+                }
+                if(std::find(neighborhood.at(neighborsNeighborIndex).begin(), neighborhood.at(neighborsNeighborIndex).end(), resident) != neighborhood.at(neighborsNeighborIndex).end() &&
+                !objects.at(resident).getChecked())
+                {
+                    objects.at(resident).setChecked(true);
+                    objects.at(resident).incPrio(10);
+                    objects.at(resident).incPrio((maxPrio - objects.at(resident).getPrio())/2);
+                }
             }
         }
         
@@ -423,9 +447,9 @@ void printNormal(vector<Object> &objects, Mat &frame, double ballRadius, int FOV
         }
 
         //crossproduct
-        vect3[0] = (vect1[1]*vect2[2] - vect1[2]*vect2[1]);
-        vect3[1] = (vect1[2]*vect2[0] - vect1[0]*vect2[2]);
-        vect3[2] = (vect1[0]*vect2[1] - vect1[1]*vect2[0]);
+        vect3[0] = vect1[1]*vect2[2] - vect1[2]*vect2[1];
+        vect3[1] = vect1[2]*vect2[0] - vect1[0]*vect2[2];
+        vect3[2] = abs(vect1[0]*vect2[1] - vect1[1]*vect2[0]);
         //Gör en overload på distance3D
         length = sqrt(pow(vect3[0], 2) + pow(vect3[1], 2) + pow(vect3[2], 2));
         for(int i=0; i<3; i++){
@@ -653,7 +677,7 @@ int main(int argc, char** argv)
 				calculate3DPosition(both, frameColor, ballRadius, FOV);
 				
 				//Create pairs by their distance
-				createPairsByDistance(both, neighborhood);
+				createPairsByDistance(both, neighborhood, frameColor);
 				
 				//Match the pairs into triangles
 				matchTriangles(both, neighborhood);
@@ -685,6 +709,7 @@ int main(int argc, char** argv)
                 //imshow("YCrCb image", ycrcbFrame);
                 imshow("Binary image YCrCb", thresholdYCrCb);
                 imshow("Binary image HSV", thresholdHSV);
+                //imshow("AND", thresholdHSV&thresholdYCrCb);
                 //imshow("Gray image", gray);
             }
             catch (cv::Exception & e)
