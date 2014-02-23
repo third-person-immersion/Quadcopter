@@ -7,7 +7,6 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <iostream>
 //#include <windows.h>
-#include "Frame.h"
 //#include <Getopt.h>
 #include <stdio.h>
 //#include <unistd.h>
@@ -345,9 +344,9 @@ void matchTriangles(vector<Object> &objects, vector< vector<int> > &neighborhood
             {
                 maxPrio = objects.at(neighbor).getPrio();
             }
-            for(int neighborsNeighborIndex = 0; neighborsNeighborIndex < neighborhood.at(neighborIndex).size(); ++neighborsNeighborIndex)
+            for(int neighborsNeighborIndex = 0; neighborsNeighborIndex < neighborhood.at(neighbor).size(); ++neighborsNeighborIndex)
             {
-                int neighborsNeighbor = neighborhood.at(neighborIndex).at(neighborsNeighborIndex);
+                int neighborsNeighbor = neighborhood.at(neighbor).at(neighborsNeighborIndex);
                 if(neighborsNeighbor == neighbor)
                 {
                     continue;
@@ -356,7 +355,7 @@ void matchTriangles(vector<Object> &objects, vector< vector<int> > &neighborhood
                 {
                     maxPrio = objects.at(neighborsNeighbor).getPrio();
                 }
-                if(std::find(neighborhood.at(neighborsNeighborIndex).begin(), neighborhood.at(neighborsNeighborIndex).end(), resident) != neighborhood.at(neighborsNeighborIndex).end() &&
+                if(std::find(neighborhood.at(neighborsNeighbor).begin(), neighborhood.at(neighborsNeighbor).end(), resident) != neighborhood.at(neighborsNeighbor).end() &&
                 !objects.at(resident).getChecked())
                 {
                     objects.at(resident).setChecked(true);
@@ -419,7 +418,7 @@ void printNormal(vector<Object> &objects, Mat &frame, double ballRadius, int FOV
     {
         double vect1[3];
         double vect2[3];
-        double vect3[3];
+        double normal[3];
         double midPos[3];
         double lineLength = 20;
         
@@ -449,13 +448,13 @@ void printNormal(vector<Object> &objects, Mat &frame, double ballRadius, int FOV
         }
 
         //crossproduct
-        vect3[0] = vect1[1]*vect2[2] - vect1[2]*vect2[1];
-        vect3[1] = vect1[2]*vect2[0] - vect1[0]*vect2[2];
-        vect3[2] = abs(vect1[0]*vect2[1] - vect1[1]*vect2[0]);
+        normal[0] = vect1[1]*vect2[2] - vect1[2]*vect2[1];
+        normal[1] = vect1[2]*vect2[0] - vect1[0]*vect2[2];
+        normal[2] = abs(vect1[0]*vect2[1] - vect1[1]*vect2[0]);
         //Gör en overload på distance3D
-        length = sqrt(pow(vect3[0], 2) + pow(vect3[1], 2) + pow(vect3[2], 2));
+        length = sqrt(pow(normal[0], 2) + pow(normal[1], 2) + pow(normal[2], 2));
         for(int i=0; i<3; i++){
-            vect3[i] = vect3[i]/length;
+            normal[i] = normal[i]/length;
         }
 
         double startX = frame.cols/2 + dist2Pix(midPos[0], objects.at(0).getRadius(), ballRadius);
@@ -464,11 +463,19 @@ void printNormal(vector<Object> &objects, Mat &frame, double ballRadius, int FOV
         //Print
         cv::line(frame, cv::Point(startX, startY),cv::Point(startX + lineLength*(vect1[0], objects.at(0).getRadius(), ballRadius), startY + lineLength*dist2Pix(vect1[1], objects.at(0).getRadius(), ballRadius)),cv::Scalar(255,0,0), 3);
         cv::line(frame, cv::Point(startX, startY),cv::Point(startX + lineLength*dist2Pix(vect2[0], objects.at(0).getRadius(), ballRadius), startY + lineLength*dist2Pix(vect2[1], objects.at(0).getRadius(), ballRadius)),cv::Scalar(0,255,0), 3);
-        cv::line(frame, cv::Point(startX, startY),cv::Point(startX + lineLength*dist2Pix(vect3[0], objects.at(0).getRadius(), ballRadius), startY + lineLength*dist2Pix(vect3[1], objects.at(0).getRadius(), ballRadius)),cv::Scalar(0,0,255), 3);
+        cv::line(frame, cv::Point(startX, startY),cv::Point(startX + lineLength*dist2Pix(normal[0], objects.at(0).getRadius(), ballRadius), startY + lineLength*dist2Pix(normal[1], objects.at(0).getRadius(), ballRadius)),cv::Scalar(0,0,255), 3);
         
         stringstream ss2;
         ss2 << "Dist to mid: " << midPos[2] << " cm :D";
         cv::putText(frame, ss2.str(), cv::Point(50, 50), 1, 2.5, cv::Scalar(0, 255, 255), 3);
+
+		double angleY = (180/PI) * atan(normal[0]/normal[2]);
+		double angleX = (180/PI) * atan(normal[1]/normal[2]);
+		double angleZ = (180/PI) * atan(normal[0]/normal[1]);
+
+        stringstream ss3;
+        ss3 << "angleY : " << angleY << " Degrees c:";
+        cv::putText(frame, ss3.str(), cv::Point(50, 100), 1, 2, cv::Scalar(0, 255, 255), 2);
     }
 }
 
