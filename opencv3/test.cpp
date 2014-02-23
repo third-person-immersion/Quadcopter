@@ -12,7 +12,9 @@
 //#include <unistd.h>
 #include "Object.h"
 #define PI 3.14159265
+#include "tclap/CmdLine.h"
 
+using namespace TCLAP;
 using namespace cv;
 using namespace std;
 
@@ -482,34 +484,29 @@ void printNormal(vector<Object> &objects, Mat &frame, double ballRadius, int FOV
 int main(int argc, char** argv)
 {
     
-	int c;
-    int debugMode = 1;
-    int camInput = 0;/*
-    while ( (c = getopt(argc, argv, "c:d")) != -1) {
-        switch (c) {
-            case 'c':
-            camInput = atoi(optarg);
-            break;
-            case 'd':
-            debugMode = 1;
-            break;
-            case '?':
-            break;
-            default:
-            printf ("?? getopt returned character code 0%o ??\n", c);
-        }
-    }
-    if (optind < argc) {
-        printf ("non-option ARGV-elements: ");
-        while (optind < argc)
-            printf ("%s ", argv[optind++]);
-        printf ("\n");
+    int dflag = 0;
+    int cflag = 0;
+    try {
+        string desc = "This is the command description";
+        CmdLine cmd(desc, ' ', "0.1");
+        ValueArg<int> debug ("d", "debug", "Activate debug mode", false, 0, "int");
+        ValueArg<int> camera ("c", "camera", "Select camera", false, 0, "int");
+        cmd.add( debug );
+        cmd.add( camera );
+        // Parse arguments
+        cmd.parse( argc, argv );
+    
+        // Do what you intend too...
+        cout << "Camera set is: "<< camera.getValue() << endl;
+        dflag = debug.getValue();
+        cflag = camera.getValue();
+    } catch ( ArgException& e )
+        { cout << "ERROR: " << e.error() << " " << e.argId() << endl;}  
+    if ( dflag ){
+        cout << "debug mode is on\n";
     }
 
-    if (debugMode){
-        cout << "debugMode is on\n";
-    }*/
-    VideoCapture cam(camInput);
+    VideoCapture cam(cflag);
 
     //Sleep(1000);
 
@@ -625,7 +622,7 @@ int main(int argc, char** argv)
     cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 720);
     cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 1280);
 
-    if(debugMode >= 1)
+    if(dflag >= 1)
     {
         cout << "Starting to capture!\n";
         cout << "Ball radius set to: " << ballRadius << "\n";
@@ -695,7 +692,7 @@ int main(int argc, char** argv)
 				std::sort(both.begin(), both.end(), sorting);
 				
 				//If in debug mode, print the prio to the screen
-				if(debugMode >= 1)
+				if(dflag >= 1)
 				{
                     for(int i = 0; i<trackedCircles.size(); ++i)
                     {
