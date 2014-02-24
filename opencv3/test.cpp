@@ -643,11 +643,19 @@ int main(int argc, char** argv)
         { cout << "ERROR: " << e.error() << " " << e.argId() << endl;}  
     if ( dflag >= 1){
         cout << "debug mode is on\n";
+        cout << "Press F to see FPS. Press Q to quit.\n";
     }
 
     VideoCapture cam(cflag);
 
     //Sleep(1000);
+
+    //Varibles for FPS counting
+    time_t start, end;
+    double fps;
+    int counter=0;
+    double sec;
+    bool printFPS=false;
 
 
     if (!cam.isOpened()) {
@@ -772,6 +780,9 @@ int main(int argc, char** argv)
         cout << "Ball radius set to: " << ballRadius << "\n";
         cout << "Debugflag set to: " << dflag << "\n";
         cout << "Purple circles is the buffered/last highest prio!\n";
+
+        // Start timer for fps counting
+        time(&start); 
     }
     
 
@@ -790,6 +801,16 @@ int main(int argc, char** argv)
         cam.read(frameColor);
 
         if (!frameColor.empty()){
+
+            if(dflag >= 1) {                
+                time(&end);
+                ++counter;
+                sec=difftime(end,start);
+                fps=counter/sec;
+                if (printFPS) {
+                    cout << "FPS: " << fps <<"\n";
+                }
+            }
 
             // Blur the image a bit
             GaussianBlur(frameColor, frameColor, Size(3, 3), 0, 0);
@@ -892,7 +913,9 @@ int main(int argc, char** argv)
                 cout << e.what() << endl;
             }
         }
-        if (waitKey(30) == 'q') break;
+        char k = waitKey(30);
+        if (k == 'q' || k == 'Q') break;
+        if (dflag>=1 && (k=='f' || k=='F')) printFPS=!printFPS;
     }
 
     return 0;
