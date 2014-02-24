@@ -338,7 +338,7 @@ void createPairsByDistance(vector<Object> &objects, vector< vector<int> > &neigh
             {
                 neighbors.push_back(j);
                 //Här ritas avståndslinjer ut
-                cv::line(frame, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), cv::Point(objects.at(j).getXPos(), objects.at(j).getYPos()),cv::Scalar(255, 255, 0), 3);
+                //cv::line(frame, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), cv::Point(objects.at(j).getXPos(), objects.at(j).getYPos()),cv::Scalar(255, 255, 0), 3);
             }
 
         }
@@ -415,39 +415,28 @@ void trackObjects(Mat &thresholdYCrCb, Mat &thresholdHSV, Mat &gray, vector<Obje
 void calculate3DPosition(vector<Object> &objects, Mat &frame, double ballRadius, int FOV)
 {
 	for(int i=0; i<objects.size(); i++){
-        
         objects.at(i).setXDist( (ballRadius / objects.at(i).getRadius()) * (objects.at(i).getXPos() - frame.cols/2) );
         objects.at(i).setYDist( (ballRadius / objects.at(i).getRadius()) * (objects.at(i).getYPos() - frame.rows/2) );
         objects.at(i).setZDist( ballRadius * frame.cols / (2*objects.at(i).getRadius()*tan(FOV * PI/360)) );
-
-        //Print the distance
-        stringstream ss;
-        ss << objects.at(i).getZDist();
-        cv::putText(frame, ss.str(), cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()-20), 2, 0.5, cv::Scalar(0,180,180), 2);
-        //stringstream ss2;
-        //ss2 << objects.at(i).getRadius();
-        //cv::putText(frame, ss2.str(), cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()+40), 1, 1, cv::Scalar(0,255,0));
-
     }
 }
 
-/** Calculatess and prints a normal to the found objects (a coordinate system)
+/** Calculates the normal and mid vector. If dFlag is >= 2, then it prints aswell. 
     The given Object list must be sorted! */
-void printNormal(vector<Object> &objects, Mat &frame, double ballRadius, int FOV, int dFlag)
+void calculatePlane(vector<Object> &objects, vector<double> &midPos, vector<double> &angles, Mat &frame, double ballRadius, int FOV, int dFlag)
 {
     if(objects.size()>=3)
     {
-        double vect1[3];
-        double vect2[3];
-        double normal[3];
-        double midPos[3];
+        vector<double> vect1;
+        vector<double> vect2;
+        vector<double> normal;
         double lineLength = 20;
         
-        vect1[0] = objects.at(1).getXDist() - objects.at(0).getXDist();
-        vect1[1] = objects.at(1).getYDist() - objects.at(0).getYDist();
-        vect1[2] = objects.at(1).getZDist() - objects.at(0).getZDist();
+        vect1.push_back(objects.at(1).getXDist() - objects.at(0).getXDist());
+        vect1.push_back(objects.at(1).getYDist() - objects.at(0).getYDist());
+        vect1.push_back(objects.at(1).getZDist() - objects.at(0).getZDist());
 
-        if(dFlag >= 2)
+        if(dFlag >= 3)
         {
             cv::line(
                 //Which fram to draw in
@@ -456,8 +445,8 @@ void printNormal(vector<Object> &objects, Mat &frame, double ballRadius, int FOV
                 cv::Point(objects.at(0).getXPos(), objects.at(0).getYPos()),
                 //End pos
                 cv::Point(
-                    objects.at(0).getXPos() + dist2Pix(vect1[0], objects.at(1).getRadius(), ballRadius),
-                    objects.at(0).getYPos() + dist2Pix(vect1[1], objects.at(1).getRadius(), ballRadius)),
+                    objects.at(0).getXPos() + dist2Pix(vect1.at(0), objects.at(1).getRadius(), ballRadius),
+                    objects.at(0).getYPos() + dist2Pix(vect1.at(1), objects.at(1).getRadius(), ballRadius)),
                 //Color
                 cv::Scalar(255, 0, 0),
                 //Scale
@@ -465,22 +454,22 @@ void printNormal(vector<Object> &objects, Mat &frame, double ballRadius, int FOV
         }
         
 
-        midPos[0] = objects.at(0).getXDist() + vect1[0]/3;
-        midPos[1] = objects.at(0).getYDist() + vect1[1]/3;
-        midPos[2] = objects.at(0).getZDist() + vect1[2]/3;
+        midPos.push_back(objects.at(0).getXDist() + vect1.at(0)/3);
+        midPos.push_back(objects.at(0).getYDist() + vect1.at(1)/3);
+        midPos.push_back(objects.at(0).getZDist() + vect1.at(2)/3);
 
         //Normalize the vector length
-        double length = sqrt(pow(vect1[0], 2) + pow(vect1[1], 2) + pow(vect1[2], 2));
+        double length = sqrt(pow(vect1.at(0), 2) + pow(vect1.at(1), 2) + pow(vect1.at(2), 2));
         for(int i=0; i<3; i++){
-            vect1[i] = vect1[i]/length;
+            vect1.at(i) = vect1.at(i)/length;
         }
 
-        vect2[0] = objects.at(2).getXDist() - objects.at(0).getXDist();
-        vect2[1] = objects.at(2).getYDist() - objects.at(0).getYDist();
-        vect2[2] = objects.at(2).getZDist() - objects.at(0).getZDist();
+        vect2.push_back(objects.at(2).getXDist() - objects.at(0).getXDist());
+        vect2.push_back(objects.at(2).getYDist() - objects.at(0).getYDist());
+        vect2.push_back(objects.at(2).getZDist() - objects.at(0).getZDist());
 
         
-        if(dFlag >= 2)
+        if(dFlag >= 3)
         {
             cv::line(
                 //Which fram to draw in
@@ -489,8 +478,8 @@ void printNormal(vector<Object> &objects, Mat &frame, double ballRadius, int FOV
                 cv::Point(objects.at(0).getXPos(), objects.at(0).getYPos()),
                 //End pos
                 cv::Point(
-                    objects.at(0).getXPos() + dist2Pix(vect2[0], objects.at(2).getRadius(), ballRadius),
-                    objects.at(0).getYPos() + dist2Pix(vect2[1], objects.at(2).getRadius(), ballRadius)),
+                    objects.at(0).getXPos() + dist2Pix(vect2.at(0), objects.at(2).getRadius(), ballRadius),
+                    objects.at(0).getYPos() + dist2Pix(vect2.at(0), objects.at(2).getRadius(), ballRadius)),
                 //Color
                 cv::Scalar(0,255,0),
                 //Scale
@@ -498,91 +487,87 @@ void printNormal(vector<Object> &objects, Mat &frame, double ballRadius, int FOV
         }
         
 
-        midPos[0] += vect2[0]/3;
-        midPos[1] += vect2[1]/3;
-        midPos[2] += vect2[2]/3;
+        midPos.at(0) += vect2.at(0)/3;
+        midPos.at(1) += vect2.at(1)/3;
+        midPos.at(2) += vect2.at(2)/3;
         
         //Normalize the vector length
-        length = sqrt(pow(vect2[0], 2) + pow(vect2[1], 2) + pow(vect2[2], 2));
+        length = sqrt(pow(vect2.at(0), 2) + pow(vect2.at(1), 2) + pow(vect2.at(2), 2));
         for(int i=0; i<3; i++){
-            vect2[i] = vect2[i]/length;
+            vect2.at(i) = vect2.at(1)/length;
         }
 
 
         //crossproduct
-        double norX = vect1[1]*vect2[2] - vect1[2]*vect2[1];
-        double norY = vect1[2]*vect2[0] - vect1[0]*vect2[2];
-        double norZ = vect1[0]*vect2[1] - vect1[1]*vect2[0];
+        double norX = vect1.at(1)*vect2.at(2) - vect1.at(2)*vect2.at(1);
+        double norY = vect1.at(2)*vect2.at(0) - vect1.at(0)*vect2.at(2);
+        double norZ = vect1.at(0)*vect2.at(1) - vect1.at(1)*vect2.at(0);
         if(norZ < 0)
         {
             norX *= -1;
             norY *= -1;
             norZ *= -1;
         }
-        normal[0] = norX;
-        normal[1] = norY;
-        normal[2] = norZ;
+        normal.push_back(norX);
+        normal.push_back(norY);
+        normal.push_back(norZ);
 
         //Normalize the vector length
-        length = sqrt(pow(normal[0], 2) + pow(normal[1], 2) + pow(normal[2], 2));
+        length = sqrt(pow(normal.at(0), 2) + pow(normal.at(1), 2) + pow(normal.at(2), 2));
         
         for(int i=0; i<3; i++){
-            normal[i] = normal[i]/length;
+            normal.at(i) = normal.at(i)/length;
         }
 
-        double startX = frame.cols/2 + dist2Pix(midPos[0], objects.at(0).getRadius(), ballRadius);
-        double startY = frame.rows/2 + dist2Pix(midPos[1], objects.at(0).getRadius(), ballRadius);
+        double startX = frame.cols/2 + dist2Pix(midPos.at(0), objects.at(0).getRadius(), ballRadius);
+        double startY = frame.rows/2 + dist2Pix(midPos.at(1), objects.at(0).getRadius(), ballRadius);
 
-        //Print Vect1
-        cv::line(frame,
-            //Start pos
-            cv::Point(startX, startY),
-            //End pos
-            cv::Point(
-                startX + lineLength*dist2Pix(vect1[0], objects.at(0).getRadius(), ballRadius),
-                startY + lineLength*dist2Pix(vect1[1], objects.at(0).getRadius(), ballRadius)),
-            //Color
-            cv::Scalar(255,0,0),
-            //Scale
-            3);
+        angles.push_back((180/PI) * atan(normal.at(0)/normal.at(2)));
+		angles.push_back((180/PI) * atan(normal.at(1)/normal.at(2)));
+		angles.push_back((180/PI) * atan(normal.at(0)/normal.at(1)));
 
-        //Print Vect2
-        cv::line(frame,
-            //Start pos
-            cv::Point(startX, startY),
-            //End pos
-            cv::Point(
-                startX + lineLength*dist2Pix(vect2[0], objects.at(0).getRadius(), ballRadius),
-                startY + lineLength*dist2Pix(vect2[1], objects.at(0).getRadius(), ballRadius)),
-            //Color
-            cv::Scalar(0,255,0),
-            //Scale
-            3);
+        if(dFlag >=2)
+        {
+            //Print Vect1
+            cv::line(frame,
+                //Start pos
+                cv::Point(startX, startY),
+                //End pos
+                cv::Point(
+                    startX + lineLength*dist2Pix(vect1.at(0), objects.at(0).getRadius(), ballRadius),
+                    startY + lineLength*dist2Pix(vect1.at(1), objects.at(0).getRadius(), ballRadius)),
+                //Color
+                cv::Scalar(255,0,0),
+                //Scale
+                3);
 
-        //Print Normal
-        cv::line(frame,
-            //Start pos
-            cv::Point(startX, startY),
-            //End pos
-            cv::Point(
-                startX + lineLength*dist2Pix(normal[0], objects.at(0).getRadius(), ballRadius),
-                startY + lineLength*dist2Pix(normal[1], objects.at(0).getRadius(), ballRadius)),
-            //Color
-            cv::Scalar(0,0,255),
-            //Scale
-            3);
+            //Print Vect2
+            cv::line(frame,
+                //Start pos
+                cv::Point(startX, startY),
+                //End pos
+                cv::Point(
+                    startX + lineLength*dist2Pix(vect2.at(0), objects.at(0).getRadius(), ballRadius),
+                    startY + lineLength*dist2Pix(vect2.at(1), objects.at(0).getRadius(), ballRadius)),
+                //Color
+                cv::Scalar(0,255,0),
+                //Scale
+                3);
+
+            //Print Normal
+            cv::line(frame,
+                //Start pos
+                cv::Point(startX, startY),
+                //End pos
+                cv::Point(
+                    startX + lineLength*dist2Pix(normal.at(0), objects.at(0).getRadius(), ballRadius),
+                    startY + lineLength*dist2Pix(normal.at(1), objects.at(0).getRadius(), ballRadius)),
+                //Color
+                cv::Scalar(0,0,255),
+                //Scale
+                3);
+        }
         
-        stringstream ss2;
-        ss2 << "Dist to mid: " << midPos[2] << " cm :D";
-        cv::putText(frame, ss2.str(), cv::Point(50, 50), 1, 2.5, cv::Scalar(0, 255, 255), 3);
-
-		double angleY = (180/PI) * atan(normal[0]/normal[2]);
-		double angleX = (180/PI) * atan(normal[1]/normal[2]);
-		double angleZ = (180/PI) * atan(normal[0]/normal[1]);
-
-        stringstream ss3;
-        ss3 << "angleY : " << angleY << " Degrees c:";
-        cv::putText(frame, ss3.str(), cv::Point(50, 100), 1, 2, cv::Scalar(0, 255, 255), 2);
     }
 }
 
@@ -642,16 +627,15 @@ int main(int argc, char** argv)
     } catch ( ArgException& e )
         { cout << "ERROR: " << e.error() << " " << e.argId() << endl;}  
     if ( dflag >= 1){
-        cout << "debug mode is on\n";
+        cout << "Debug mode is ON and set to: " << dflag << "\n";
         cout << "Press F to see FPS in console. Press Q to quit.\n";
     }
 
     VideoCapture cam(cflag);
 
-    //Sleep(1000);
 
     //Varibles for FPS counting
-    time_t start, end;
+    time_t start = 0, end = 0;
     double fps;
     int counter=0;
     double sec;
@@ -685,6 +669,11 @@ int main(int argc, char** argv)
     vector<Object> lastPrio;
     
     vector< vector<int> > neighborhood;
+
+    //The acctual interesting schtuff
+    vector<double> midPos;
+    //The angles to the plane;
+    vector<double> angles;
 
     /** Microsoft webcam
         Blått papper
@@ -763,31 +752,32 @@ int main(int argc, char** argv)
     ERODE = 1;
     DILATE = 1; 
     
-    //Create the trackbars for both colors
-    createTrackbars(1, "Y_MIN", "Y_MAX", "Cr_MIN", "Cr_MAX", "Cb_MIN", "Cb_MAX", &Y_MIN, &Y_MAX, &Cr_MIN, &Cr_MAX, &Cb_MIN, &Cb_MAX);
-    createTrackbars(2, "H_MIN", "H_MAX", "S_MIN", "S_MAX", "V_MIN", "V_MAX", &H_MIN, &H_MAX, &S_MIN, &S_MAX, &V_MIN, &V_MAX);
 
-    //Sleep(1000);
+    if(dflag >= 1)
+    {
+        if(dflag >= 2)
+        {
+            //Create the trackbars for both colors
+            createTrackbars(1, "Y_MIN", "Y_MAX", "Cr_MIN", "Cr_MAX", "Cb_MIN", "Cb_MAX", &Y_MIN, &Y_MAX, &Cr_MIN, &Cr_MAX, &Cb_MIN, &Cb_MAX);
+            createTrackbars(2, "H_MIN", "H_MAX", "S_MIN", "S_MAX", "V_MIN", "V_MAX", &H_MIN, &H_MAX, &S_MIN, &S_MAX, &V_MIN, &V_MAX);
+
+            cout << "Starting to capture!\nBall radius set to: " << ballRadius << "\n";
+            cout << "Purple circles is the buffered/last highest prio!\n";
+        }
+
+        // Start timer for fps counting
+        time(&start); 
+    }
+
     
     //Force the image to be at 1280x720 _IF_ the camera supports it, otherwise it will be the cameras maximum res
     CvCapture* capture = cvCreateCameraCapture(0);
     cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 720);
     cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 1280);
 
-    if(dflag >= 1)
-    {
-        cout << "Starting to capture!\n";
-        cout << "Ball radius set to: " << ballRadius << "\n";
-        cout << "Debugflag set to: " << dflag << "\n";
-        cout << "Purple circles is the buffered/last highest prio!\n";
-
-        // Start timer for fps counting
-        time(&start); 
-    }
-    
-
 
     while (1) {
+        
         //Clear from old loop
         both.clear();
         bothTemp.clear();
@@ -796,12 +786,15 @@ int main(int argc, char** argv)
         trackedHSV.clear();
         trackedCircles.clear();
         neighborhood.clear();
-
+        midPos.clear();
+        angles.clear();
+        
         //read the frame from the camera
         cam.read(frameColor);
 
         if (!frameColor.empty()){
 
+            // FPS viewer
             if(dflag >= 1) {
                 // FPS viewer
                 time(&end);
@@ -813,6 +806,7 @@ int main(int argc, char** argv)
                     cout << "FPS: " << fps <<"\n";
                 }
             }
+            
 
             // Blur the image a bit
             GaussianBlur(frameColor, frameColor, Size(3, 3), 0, 0);
@@ -864,14 +858,7 @@ int main(int argc, char** argv)
 				
 				//Sort the "both" vector with the highest prio first
 				std::sort(both.begin(), both.end(), sorting);
-
-                if(dflag >= 1)
-                {
-                    for(int i = 0; i<lastPrio.size(); ++i)
-                    {
-                        circle(frameColor, Point(lastPrio.at(i).getXPos(), lastPrio.at(i).getYPos()), lastPrio.at(i).getRadius(), Scalar(255,0,255), 2);
-                    }
-                }
+                
 
                 //Move the three highest prioritized circles into the buffer, making use of them in the next loop
                 lastPrio.clear();
@@ -882,13 +869,19 @@ int main(int argc, char** argv)
                     copyObject(both.at(2), lastPrio);
                 }
                 
+                calculatePlane(both, midPos, angles, frameColor, ballRadius, FOV, dflag);
+                
 				
 				//If in debug mode, print the prio to the screen
-				if(dflag >= 1)
+				if(dflag >= 2)
 				{
                     for(int i = 0; i<trackedCircles.size(); ++i)
                     {
                         circle(frameColor, Point(trackedCircles.at(i).getXPos(), trackedCircles.at(i).getYPos()), trackedCircles.at(i).getRadius(), Scalar(255,255,0), 2);
+                    }
+                    for(int i = 0; i<lastPrio.size(); ++i)
+                    {
+                        circle(frameColor, Point(lastPrio.at(i).getXPos(), lastPrio.at(i).getYPos()), lastPrio.at(i).getRadius(), Scalar(255,0,255), 2);
                     }
                     /*for(int i = 0; i<trackedHSV.size(); ++i)
                     {
@@ -899,16 +892,31 @@ int main(int argc, char** argv)
                         circle(frameColor, Point(trackedYCrCb.at(i).getXPos(), trackedYCrCb.at(i).getYPos()), trackedYCrCb.at(i).getRadius(), Scalar(0,255,255));
                     }*/
                     printPrio(both, frameColor);
-                    printNormal(both, frameColor, ballRadius, FOV, dflag);
-                    //FPS
-                    cv::putText(frameColor,"FPS: "+std::to_string(fps),Point(50,130), 1, 1, cv::Scalar(255, 0, 0), 2);
 				}
+                if(dflag >= 1)
+                {
+                    //FPS
+                    cv::putText(frameColor,"FPS: "+std::to_string(fps),Point(50,130), 1, 1.2, cv::Scalar(0, 255, 255), 1);
+
+                    if(midPos.size() == 3)
+                    {
+                        cv::putText(frameColor, "Dist to mid: " + std::to_string(midPos.at(2)) + " cm :D", cv::Point(50, 50), 1, 2.5, cv::Scalar(0, 255, 255), 3);
+                        cv::putText(frameColor, "X", cv::Point(frameColor.cols/2 + dist2Pix(midPos.at(0), both.at(0).getRadius(), ballRadius), frameColor.rows/2 + dist2Pix(midPos.at(1), both.at(0).getRadius(), ballRadius)), 1, 2.5, cv::Scalar(0, 0, 255), 3);
+                    }
+                    if(angles.size() == 3)
+                    {
+                        cv::putText(frameColor, "angleY : " + std::to_string(angles.at(1)) + " Degrees c:", cv::Point(50, 100), 1, 2, cv::Scalar(0, 255, 255), 2);
+                    }
+                    
+                }
+                
+                
 
                 // Display image
                 imshow("Image", frameColor);
                 //imshow("YCrCb image", ycrcbFrame);
-                imshow("Binary image YCrCb", thresholdYCrCb);
-                imshow("Binary image HSV", thresholdHSV);
+                //imshow("Binary image YCrCb", thresholdYCrCb);
+                //imshow("Binary image HSV", thresholdHSV);
                 //imshow("AND", thresholdHSV&thresholdYCrCb);
                 //imshow("Gray image", gray);
             }
@@ -917,7 +925,7 @@ int main(int argc, char** argv)
                 cout << e.what() << endl;
             }
         }
-        char k = waitKey(30);
+        char k = waitKey(1);
         if (k == 'q' || k == 'Q') break;
         if (dflag>=1 && (k=='f' || k=='F')) printFPS=!printFPS;
     }
