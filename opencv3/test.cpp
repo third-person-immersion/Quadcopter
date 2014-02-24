@@ -218,6 +218,7 @@ vector<Object> findObjects(Mat &frame){
     return objects;
 }
 
+/** Checks the ratio between object a and b. If it is less than or equal to the given ratio, True will be returned  */
 bool checkRadiusRatio(Object &a, Object &b, double ratio)
 {
     if(a.getRadius() > b.getRadius())
@@ -481,6 +482,40 @@ void printNormal(vector<Object> &objects, Mat &frame, double ballRadius, int FOV
     }
 }
 
+void matchLast(vector<Object> &last, vector<Object> &dst)
+{
+    for(int i = 0; i < dst.size(); ++i)
+    {
+        for(int j = 0; j < last.size(); ++j)
+        {
+            //Check if the radius and position of the circles and the filtered objects match
+            if(dst.at(i).getXPos() - dst.at(i).getRadius() <= last.at(j).getXPos() && last.at(j).getXPos() <= dst.at(i).getXPos() + dst.at(i).getRadius() &&
+                dst.at(i).getYPos() - dst.at(i).getRadius() <= last.at(j).getYPos() && last.at(j).getYPos() <= dst.at(i).getYPos() + dst.at(i).getRadius() &&
+                checkRadiusRatio(dst.at(i), last.at(j), 2))
+            {
+                dst.at(i).incPrio(20);
+            }
+        }
+    }
+}
+
+void copyObject(Object &src, vector<Object> &dst)
+{
+    Object o;
+    o.setXPos(src.getXPos());
+    o.setYPos(src.getYPos());
+    o.setArea(src.getArea());
+    o.setRadius(src.getRadius());
+    o.setAdded(src.getAdded());
+    o.setChecked(src.getChecked());
+    o.setPrio(src.getPrio());
+    o.setType(src.getType());
+    o.setXDist(src.getXDist());
+    o.setYDist(src.getYDist());
+    o.setZDist(src.getZDist());
+    dst.push_back(o);
+}
+
 int main(int argc, char** argv)
 {
     
@@ -502,7 +537,7 @@ int main(int argc, char** argv)
         cflag = camera.getValue();
     } catch ( ArgException& e )
         { cout << "ERROR: " << e.error() << " " << e.argId() << endl;}  
-    if ( dflag ){
+    if ( dflag >= 1){
         cout << "debug mode is on\n";
     }
 
@@ -532,6 +567,10 @@ int main(int argc, char** argv)
 	
 	vector<Object> both;
 	vector<Object> bothTemp;
+	vector<Object> bothTemp2;
+
+    //Last prio
+    vector<Object> lastPrio;
     
     vector< vector<int> > neighborhood;
 
@@ -592,22 +631,23 @@ int main(int argc, char** argv)
     //For YCbCr filtering
     Y_MIN = 0;
     Y_MAX = 256;
-    Cr_MIN = 98;
-    Cr_MAX = 156;
+    Cr_MIN = 0;
+    Cr_MAX = 256;
     Cb_MIN = 144;
     Cb_MAX = 256;
     //For HSV filtering
-    H_MIN = 109;
-    H_MAX = 170;
-    S_MIN = 25;
-    S_MAX = 228;
+    H_MIN = 98;
+    H_MAX = 136;
+    S_MIN = 124;
+    S_MAX = 256;
     V_MIN = 0;
     V_MAX = 256;
     //Same for both color filters
     MINAREA = 300;
-    MAXAREA = 15000;
-    cP1 = 195;
-    cP2 = 20;
+    MAXAREA = 30000;
+    cP1 = 100;
+    cP2 = 12;
+    maxHoughRadius = 110;
     ERODE = 1;
     DILATE = 1; 
     
@@ -634,6 +674,7 @@ int main(int argc, char** argv)
         //Clear from old loop
         both.clear();
         bothTemp.clear();
+        bothTemp2.clear();
         trackedYCrCb.clear();
         trackedHSV.clear();
         trackedCircles.clear();
@@ -678,6 +719,10 @@ int main(int argc, char** argv)
 				//Match the filtered circles from YCrCb and HSV with eachother and set the prio
 				matchObjects(trackedYCrCb, trackedHSV, bothTemp);
 				matchObjects(bothTemp, trackedCircles, both);
+                if(lastPrio.size() == 3)
+                {
+                    matchLast(lastPrio, both);
+                }
 				
 				//Set the distance for X, Y and Z for all the objects in the both vector
 				calculate3DPosition(both, frameColor, ballRadius, FOV);
@@ -690,6 +735,24 @@ int main(int argc, char** argv)
 				
 				//Sort the "both" vector with the highest prio first
 				std::sort(both.begin(), both.end(), sorting);
+
+                if(dflag >= 1)
+                {
+                    for(int i = 0; i<lastPrio.size(); ++i)
+                    {
+                        circle(frameColor, Point(lastPrio.at(i).getXPos(), lastPrio.at(i).getYPos()), lastPrio.at(i).getRadius(), Scalar(255,0,255), 2);
+                    }
+                }
+
+                //Move the three highest prioritized circles into the buffer, making use of them in the next loop
+                lastPrio.clear();
+                if(both.size() >= 3)
+                {
+                    copyObject(both.at(0), lastPrio);
+                    copyObject(both.at(1), lastPrio);
+                    copyObject(both.at(2), lastPrio);
+                }
+                
 				
 				//If in debug mode, print the prio to the screen
 				if(dflag >= 1)
