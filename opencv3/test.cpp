@@ -123,7 +123,7 @@ void createTrackbars(int number, char* min1, char* max1, char* min2, char* max2,
 void morphOps(Mat &thresh){
 
     //create structuring element that will be used to "dilate" and "erode" image.
-    //the element chosen here is a 3px by 3px rectangle
+    //the element chosen here is a rectangle with size from variables ERODE/DILATE
 
     Mat erodeElement = getStructuringElement(MORPH_RECT, Size(ERODE, ERODE));
     //dilate with larger element so make sure object is nicely visible
@@ -643,7 +643,7 @@ int main(int argc, char** argv)
         { cout << "ERROR: " << e.error() << " " << e.argId() << endl;}  
     if ( dflag >= 1){
         cout << "debug mode is on\n";
-        cout << "Press F to see FPS. Press Q to quit.\n";
+        cout << "Press F to see FPS in console. Press Q to quit.\n";
     }
 
     VideoCapture cam(cflag);
@@ -802,11 +802,13 @@ int main(int argc, char** argv)
 
         if (!frameColor.empty()){
 
-            if(dflag >= 1) {                
+            if(dflag >= 1) {
+                // FPS viewer
                 time(&end);
                 ++counter;
                 sec=difftime(end,start);
                 fps=counter/sec;
+
                 if (printFPS) {
                     cout << "FPS: " << fps <<"\n";
                 }
@@ -898,6 +900,8 @@ int main(int argc, char** argv)
                     }*/
                     printPrio(both, frameColor);
                     printNormal(both, frameColor, ballRadius, FOV, dflag);
+                    //FPS
+                    cv::putText(frameColor,"FPS: "+std::to_string(fps),Point(50,130), 1, 1, cv::Scalar(255, 0, 0), 2);
 				}
 
                 // Display image
