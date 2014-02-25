@@ -13,6 +13,8 @@
 #include "Object.h"
 #define PI 3.14159265
 #include "tclap/CmdLine.h"
+#include <sys/timeb.h>
+
 
 using namespace TCLAP;
 using namespace cv;
@@ -49,7 +51,21 @@ double ballRadius = 7.5/2;
 //Microsoft webcam
 int FOV = 48;//66;
 
+// FPS - Get count in millisoconds
+int getMilliCount(){
+    timeb tb;
+    ftime(&tb);
+    int nCount = tb.millitm + (tb.time & 0xfffff) * 1000;
+    return nCount;
+}
 
+// FPS - Calculate the difference between start and end time.
+int getMilliSpan(int timeStart){
+    int span = getMilliCount() - timeStart;
+    if (span < 0)
+        span += 0x100000 * 1000;
+    return span;
+}
 
 void on_trackbar(int, void*)
 {//This function gets called whenever a
@@ -635,11 +651,10 @@ int main(int argc, char** argv)
 
 
     //Varibles for FPS counting
-    time_t start = 0, end = 0;
+    int startTime;
+    int endTime;
     double fps;
-    int counter=0;
-    double sec;
-    bool printFPS=false;
+    bool printFPS = false;
 
 
     if (!cam.isOpened()) {
@@ -766,7 +781,7 @@ int main(int argc, char** argv)
         }
 
         // Start timer for fps counting
-        time(&start); 
+        startTime = getMilliCount();
     }
 
     
@@ -792,22 +807,19 @@ int main(int argc, char** argv)
         //read the frame from the camera
         cam.read(frameColor);
 
-        if (!frameColor.empty()){
-
+        // FPS viewer
+        if (dflag >= 1) {
             // FPS viewer
-            if(dflag >= 1) {
-                // FPS viewer
-                time(&end);
-                ++counter;
-                sec=difftime(end,start);
-                fps=counter/sec;
+            double milliSpan = (double)getMilliSpan(startTime) / 1000;
 
-                if (printFPS) {
-                    cout << "FPS: " << fps <<"\n";
-                }
+            fps = 1 / milliSpan;
+            if (printFPS) {
+                cout << "FPS: " << fps << "\n";
             }
-            
+            startTime = getMilliCount();
+        }
 
+        if (!frameColor.empty()){
             // Blur the image a bit
             GaussianBlur(frameColor, frameColor, Size(3, 3), 0, 0);
         
