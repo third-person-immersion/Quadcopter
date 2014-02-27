@@ -25,4 +25,5 @@
 *.app
 
 Debug/
+Release/
 Quadcopter/
