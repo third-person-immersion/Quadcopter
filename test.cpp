@@ -28,8 +28,8 @@ using namespace TCLAP;
 using namespace cv;
 using namespace std;
 
-int MAX_DISTANCE_BETWEEN_CIRCLES = 59;
-int MIN_DISTANCE_BETWEEN_CIRCLES = 37;
+int MAX_DISTANCE_BETWEEN_CIRCLES = 25;
+int MIN_DISTANCE_BETWEEN_CIRCLES = 10;
 int MINAREA = 2000;
 int MAXAREA = 15000;
 int ERODE = 30;
@@ -57,7 +57,9 @@ int ballDist = 20;
 double ballRadius = 7.5/2;
 //The Field Of View of the camera used at the moment
 //Microsoft webcam
-int FOV = 48;//66;
+int FOV = 66; //48;
+
+string windowTitle = "frame";
 
 // FPS - Get count in millisoconds
 int getMilliCount(){
@@ -664,12 +666,36 @@ void trackYCrCbObjects(Mat &frame, Mat &threashold, vector<Object> &foundObjects
 	findObjects(frameThreshold, foundObjects);
 }
 
+void trackObjects(Mat &frame, Mat &threashold, vector<Object> &foundObjects, int code, Scalar &scalarMin, Scalar &scalarMax)
+{
+    Mat target;
+	//Black and white frames
+    Mat frameThreshold;
+	
+	// Convert from frame (RGB) to YCrCb
+    cvtColor(frame, target, code);
+	
+	// Convert traget to binary B&W
+	inRange(target, scalarMin, scalarMax, threashold);
+	
+	//Gaussian the black/white image
+	GaussianBlur(threashold, threashold, Size(3, 3), 0, 0);
+	
+	//morphops the black/white image
+	morphOps(threashold);
+
+    threashold.copyTo(frameThreshold);
+	
+	findObjects(frameThreshold, foundObjects);
+}
+
 int main(int argc, char** argv)
 {
     
     int dflag = 0;
     int cflag = 0;
-    try {
+    try
+    {
         string desc = "This is the command description";
         CmdLine cmd(desc, ' ', "0.1");
         ValueArg<int> debug ("d", "debug", "Activate debug mode", false, 0, "int");
@@ -683,12 +709,11 @@ int main(int argc, char** argv)
         cout << "Camera set is: "<< camera.getValue() << endl;
         dflag = debug.getValue();
         cflag = camera.getValue();
-    } catch ( ArgException& e )
-        { cout << "ERROR: " << e.error() << " " << e.argId() << endl;}  
-    if ( dflag >= 1){
-        cout << "Debug mode is ON and set to: " << dflag << "\n";
-        cout << "Press F to see FPS in console. Press Q to quit.\n";
     }
+    catch ( ArgException& e )
+    {
+        cout << "ERROR: " << e.error() << " " << e.argId() << endl;
+    }  
 
     VideoCapture cam(cflag);
 
@@ -715,15 +740,14 @@ int main(int argc, char** argv)
 	vector<Object> trackedYCrCb;
     vector<Object> trackedHSV;
 	vector<Object> trackedCircles;
-	
 	vector<Object> both;
 	vector<Object> bothTemp;
-	vector<Object> bothTemp2;
-
-    //Last prio
     vector<Object> lastPrio;
-    
     vector< vector<int> > neighborhood;
+
+    /********************************************************************\
+    **    HERE IS THE ACTUAL DATA WE NEED TO POSITION THE QUADCOPTER    **
+    \********************************************************************/
 
     //The acctual interesting schtuff
     vector<double> midPos;
@@ -757,9 +781,14 @@ int main(int argc, char** argv)
     ERODE = 1;
     DILATE = 1; 
     
+    string windowYCrCb = "YCrCb image";
+    string windowHSV = "HSV image";
 
     if(dflag >= 1)
     {
+        cout << "Debug mode is ON and set to: " << dflag << "\n";
+        cout << "Press F to see FPS in console. Press Q to quit.\n";
+
         if(dflag >= 2)
         {
             //Create the trackbars for both colors
@@ -767,18 +796,17 @@ int main(int argc, char** argv)
             createTrackbars(2, "H_MIN", "H_MAX", "S_MIN", "S_MAX", "V_MIN", "V_MAX", &H_MIN, &H_MAX, &S_MIN, &S_MAX, &V_MIN, &V_MAX);
 
             cout << "Starting to capture!\nBall radius set to: " << ballRadius << "\n";
-            cout << "Purple circles is the buffered/last highest prio!\n";
+            
+            namedWindow(windowYCrCb, CV_WINDOW_AUTOSIZE );
+            namedWindow(windowHSV, CV_WINDOW_AUTOSIZE );
         }
+        
+        //Create window
+        namedWindow(windowTitle, CV_WINDOW_FREERATIO );
 
         // Start timer for fps counting
         startTime = getMilliCount();
     }
-
-    
-    //Force the image to be at 1280x720 _IF_ the camera supports it, otherwise it will be the cameras maximum res
-    //CvCapture* capture = cvCreateCameraCapture(0);
-    //cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 720);
-    //cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 1280);
 
 
     while (loop) {
@@ -786,7 +814,6 @@ int main(int argc, char** argv)
         //Clear from old loop
         both.clear();
         bothTemp.clear();
-        bothTemp2.clear();
         trackedYCrCb.clear();
         trackedHSV.clear();
         trackedCircles.clear();
@@ -814,6 +841,8 @@ int main(int argc, char** argv)
             // Blur the image a bit
             GaussianBlur(frameColor, frameColor, Size(3, 3), 0, 0);
 
+            //These can be used if threaded calculations is desired. Just dont forget to join (begining of try-block)
+            /*
             //Start thread 1 that will handle the YCrCb color
             thread YCrCbThread(trackYCrCbObjects, std::ref(frameColor), std::ref(threasholdYCrCb), std::ref(trackedYCrCb));
 
@@ -822,15 +851,20 @@ int main(int argc, char** argv)
             
             //Start thread 3 that will handle the circle detection
             thread CircleThread(trackCircles, std::ref(frameColor), std::ref(trackedCircles));
+            */
+            trackObjects(frameColor, threasholdYCrCb, trackedYCrCb, CV_RGB2YCrCb, Scalar(Y_MIN, Cr_MIN, Cb_MIN), Scalar(Y_MAX, Cr_MAX, Cb_MAX));
+            trackObjects(frameColor, threasholdHSV, trackedHSV, CV_RGB2HSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX));
+            trackCircles(frameColor, trackedCircles);
 
             try {
-                YCrCbThread.join();
-                HSVThread.join();
-                CircleThread.join();
+                //YCrCbThread.join();
+                //HSVThread.join();
+                //CircleThread.join();
                 
 				//Match the filtered circles from YCrCb and HSV with eachother and set the prio
 				matchObjects(trackedYCrCb, trackedHSV, bothTemp, false);
 				matchObjects(bothTemp, trackedCircles, both, true);
+                //If there is three objects from the previous loop
                 if(lastPrio.size() == 3)
                 {
                     matchLast(lastPrio, both);
@@ -847,7 +881,6 @@ int main(int argc, char** argv)
 				
 				//Sort the "both" vector with the highest prio first
 				std::sort(both.begin(), both.end(), sorting);
-                
 
                 //Move the three highest prioritized circles into the buffer, making use of them in the next loop
                 lastPrio.clear();
@@ -885,16 +918,16 @@ int main(int argc, char** argv)
                 if(dflag >= 1)
                 {
                     //FPS
-                    cv::putText(frameColor,"FPS: "+std::to_string(fps),Point(50,130), 1, 1.2, cv::Scalar(0, 255, 255), 1);
+                    putText(frameColor,"FPS: "+std::to_string(fps),Point(50,130), 1, 1.2, cv::Scalar(0, 255, 255), 1);
 
                     if(midPos.size() == 3)
                     {
-                        cv::putText(frameColor, "Dist to mid: " + std::to_string(midPos.at(2)) + " cm :D", cv::Point(50, 50), 1, 2.5, cv::Scalar(0, 255, 255), 3);
-                        cv::putText(frameColor, "X", cv::Point(frameColor.cols/2 + dist2Pix(midPos.at(0), both.at(0).getRadius(), ballRadius), frameColor.rows/2 + dist2Pix(midPos.at(1), both.at(0).getRadius(), ballRadius)), 1, 2.5, cv::Scalar(0, 0, 255), 3);
+                        putText(frameColor, "Dist to mid: " + std::to_string(midPos.at(2)) + " cm :D", cv::Point(50, 50), 1, 2.5, cv::Scalar(0, 255, 255), 3);
+                        circle(frameColor, Point(frameColor.cols/2 + dist2Pix(midPos.at(0), both.at(0).getRadius(), ballRadius), frameColor.rows/2 + dist2Pix(midPos.at(1), both.at(0).getRadius(), ballRadius)), 3, cv::Scalar(0, 0, 0), 3);
                     }
                     if(angles.size() == 3)
                     {
-                        cv::putText(frameColor, "angleY : " + std::to_string(angles.at(1)) + " Degrees c:", cv::Point(50, 100), 1, 2, cv::Scalar(0, 255, 255), 2);
+                        putText(frameColor, "angleY : " + std::to_string(angles.at(1)) + " Degrees c:", cv::Point(50, 100), 1, 2, cv::Scalar(0, 255, 255), 2);
                     }
                     
                 }
@@ -904,12 +937,18 @@ int main(int argc, char** argv)
                 // Display image
                 if(dflag >= 1)
                 {
-                    imshow("Image", frameColor);
+                    imshow(windowTitle, frameColor);
                     
                 }
                 if(dflag >=2){
-                    //imshow("YCrCb image", frameYCrCb);
-                    //imshow("HSV image", frameHSV);
+                    if(!threasholdYCrCb.empty())
+                    {
+                        imshow(windowYCrCb, threasholdYCrCb);
+                    }
+                    if(!threasholdHSV.empty())
+                    {
+                        imshow(windowHSV, threasholdHSV);
+                    }
                     //imshow("AND", thresholdHSV&thresholdYCrCb);
                     //imshow("Gray image", gray);
                 }
