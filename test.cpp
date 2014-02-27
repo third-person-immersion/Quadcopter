@@ -10,7 +10,15 @@
 //#include <Getopt.h>
 #include <stdio.h>
 //#include <unistd.h>
+#include <thread>
 #include "Object.h"
+
+
+#include <iostream>
+#include "opencv2/opencv.hpp"
+#include "opencv2/gpu/gpu.hpp"
+
+
 #define PI 3.14159265
 #include "tclap/CmdLine.h"
 #include <sys/timeb.h>
@@ -20,8 +28,8 @@ using namespace TCLAP;
 using namespace cv;
 using namespace std;
 
-int MAX_DISTANCE_BETWEEN_CIRCLES = 30;
-int MIN_DISTANCE_BETWEEN_CIRCLES = 10;
+int MAX_DISTANCE_BETWEEN_CIRCLES = 59;
+int MIN_DISTANCE_BETWEEN_CIRCLES = 37;
 int MINAREA = 2000;
 int MAXAREA = 15000;
 int ERODE = 30;
@@ -199,13 +207,12 @@ double radiusDiff(Object a, Object b){
     return abs(a.getRadius() - b.getRadius());
 }
 
-vector<Object> findObjects(Mat &frame){
+void findObjects(Mat &frame, vector<Object> &objects){
     double posX;
     double posY;
     Moments mom;
     vector<Vec4i> hierarchy;
     vector< vector<Point> > contours;
-    vector<Object> objects;
     
     findContours(frame, contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_NONE);
 
@@ -234,7 +241,6 @@ vector<Object> findObjects(Mat &frame){
             }
         }
     }
-    return objects;
 }
 
 /** Checks the ratio between object a and b. If it is less than or equal to the given ratio, True will be returned  */
@@ -406,23 +412,16 @@ void matchTriangles(vector<Object> &objects, vector< vector<int> > &neighborhood
 
 
 
-void trackObjects(Mat &thresholdYCrCb, Mat &thresholdHSV, Mat &gray, vector<Object> &trackedYCrCb, vector<Object> &trackedHSV, vector<Object> &tackedCircles) {
-    //A temporary Mat of the black&white frames are needed, otherwise the originals will be destroyed
-    Mat tempFindYCrCb, tempHoughYCrCb, tempFindHSV, tempHoughHSV;
-    thresholdYCrCb.copyTo(tempFindYCrCb);
-    thresholdYCrCb.copyTo(tempHoughYCrCb);
-    thresholdHSV.copyTo(tempFindHSV);
-    thresholdHSV.copyTo(tempHoughHSV);
+void trackCircles(Mat &frame, vector<Object> &tackedCircles) {
+    Mat gray;
+    //Convert to grayscale
+    cvtColor(frame, gray, CV_BGR2GRAY);
+    //Gaussian the grey image
+    GaussianBlur(gray, gray, Size(3, 3), 0, 0);
     //A temporary list in which the detected circles will be until they are converted into a list of Object
     vector<Vec3f> circlesTemp;
-
-    //Get objects from frame
-    trackedYCrCb = findObjects(tempFindYCrCb);
-    trackedHSV = findObjects(tempFindHSV);
-
     // Apply the Hough Transform to find the circles in the frame
     HoughCircles(gray, circlesTemp, CV_HOUGH_GRADIENT, 1, 80, cP1, cP2, 0, maxHoughRadius);
-
     //Convert the circles to objects and put them in the "circles" vector
     circleToObject(circlesTemp, tackedCircles);
 }
@@ -621,6 +620,50 @@ void copyObject(Object &src, vector<Object> &dst)
     dst.push_back(o);
 }
 
+void trackHSVObjects(Mat &frame, Mat &threashold, vector<Object> &foundObjects)
+{
+    Mat target;
+	//Black and white frames
+    Mat frameThreshold;
+    threashold.copyTo(frameThreshold);
+	
+	// Convert from frame (RGB) to HSV
+    cvtColor(frame, target, COLOR_RGB2HSV);
+	
+	// Convert traget to binary B&W
+	inRange(target, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX), frameThreshold);
+	
+	//Gaussian the black/white image
+	GaussianBlur(frameThreshold, frameThreshold, Size(3, 3), 0, 0);
+	
+	//morphops the black/white image
+	morphOps(frameThreshold);
+	
+	findObjects(frameThreshold, foundObjects);
+}
+
+void trackYCrCbObjects(Mat &frame, Mat &threashold, vector<Object> &foundObjects)
+{
+    Mat target;
+	//Black and white frames
+    Mat frameThreshold;
+    threashold.copyTo(frameThreshold);
+	
+	// Convert from frame (RGB) to YCrCb
+    cvtColor(frame, target, COLOR_RGB2YCrCb);
+	
+	// Convert traget to binary B&W
+	inRange(target, Scalar(Y_MIN, Cr_MIN, Cb_MIN), Scalar(Y_MAX, Cr_MAX, Cb_MAX), frameThreshold);
+	
+	//Gaussian the black/white image
+	GaussianBlur(frameThreshold, frameThreshold, Size(3, 3), 0, 0);
+	
+	//morphops the black/white image
+	morphOps(frameThreshold);
+	
+	findObjects(frameThreshold, foundObjects);
+}
+
 int main(int argc, char** argv)
 {
     
@@ -655,6 +698,7 @@ int main(int argc, char** argv)
     int endTime;
     double fps;
     bool printFPS = false;
+    bool loop = true;
 
 
     if (!cam.isOpened()) {
@@ -665,13 +709,9 @@ int main(int argc, char** argv)
     }
 
     //Colored frames
-    Mat frameColor, frameHSV, frameYCrCb;
-    //Black and white frames
-    Mat thresholdHSV, thresholdYCrCb;
-    //Grayscale frames
-    Mat gray;
-	
-	
+    Mat frameColor, threasholdYCrCb, threasholdHSV;
+
+
 	vector<Object> trackedYCrCb;
     vector<Object> trackedHSV;
 	vector<Object> trackedCircles;
@@ -691,78 +731,28 @@ int main(int argc, char** argv)
     vector<double> angles;
 
     /** Microsoft webcam
-        Blått papper
-        YCbCr färger och HSV färger
-    //For YCbCr filtering
-    Y_MIN = 0;
-    Y_MAX = 256;
-    Cr_MIN = 100;//142;
-    Cr_MAX = 256;
-    Cb_MIN = 0;
-    Cb_MAX = 127;//109;
-    //For HSV filtering
-    H_MIN = 0;
-    H_MAX = 90;
-    S_MIN = 40;//91;
-    S_MAX = 256;
-    V_MIN = 0;
-    V_MAX = 256;
-    //Same for both color filters
-    MINAREA = 300;
-    MAXAREA = 10000;
-    cP1 = 300;
-    cP2 = 20;
-    ERODE = 1;
-    DILATE = 2; */
-
-    /** Microsoft webcam
-        Cerist papper
-        YCbCr färger och HSV färger 
-    //For YCbCr filtering
-    Y_MIN = 0;
-    Y_MAX = 256;
-    Cr_MIN = 110;
-    Cr_MAX = 256;
-    Cb_MIN = 150;
-    Cb_MAX = 256;
-    //For HSV filtering
-    H_MIN = 105;
-    H_MAX = 256;
-    S_MIN = 33;
-    S_MAX = 256;
-    V_MIN = 0;
-    V_MAX = 256;
-    //Same for both color filters
-    MINAREA = 300;
-    MAXAREA = 10000;
-    cP1 = 300;
-    cP2 = 20;
-    ERODE = 1;
-    DILATE = 1;
-    */
-
-    /** Microsoft webcam
         cerisa bollar
         YCbCr färger och HSV färger*/
+
     //For YCbCr filtering
     Y_MIN = 0;
     Y_MAX = 256;
-    Cr_MIN = 0;
-    Cr_MAX = 256;
-    Cb_MIN = 144;
+    Cr_MIN = 109;
+    Cr_MAX = 175;
+    Cb_MIN = 161;
     Cb_MAX = 256;
     //For HSV filtering
-    H_MIN = 98;
-    H_MAX = 136;
-    S_MIN = 124;
+    H_MIN = 112;
+    H_MAX = 161;
+    S_MIN = 142;
     S_MAX = 256;
     V_MIN = 0;
     V_MAX = 256;
     //Same for both color filters
-    MINAREA = 300;
+    MINAREA = 100;
     MAXAREA = 30000;
-    cP1 = 100;
-    cP2 = 12;
+    cP1 = 137;
+    cP2 = 20;
     maxHoughRadius = 110;
     ERODE = 1;
     DILATE = 1; 
@@ -786,12 +776,12 @@ int main(int argc, char** argv)
 
     
     //Force the image to be at 1280x720 _IF_ the camera supports it, otherwise it will be the cameras maximum res
-    CvCapture* capture = cvCreateCameraCapture(0);
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 720);
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 1280);
+    //CvCapture* capture = cvCreateCameraCapture(0);
+    //cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 720);
+    //cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 1280);
 
 
-    while (1) {
+    while (loop) {
         
         //Clear from old loop
         both.clear();
@@ -819,37 +809,24 @@ int main(int argc, char** argv)
             startTime = getMilliCount();
         }
 
+
         if (!frameColor.empty()){
             // Blur the image a bit
             GaussianBlur(frameColor, frameColor, Size(3, 3), 0, 0);
-        
-            // Convert from RGB to YCrCb
-            cvtColor(frameColor, frameYCrCb, COLOR_RGB2YCrCb);
-            // Convert from RGB to HSV
-            cvtColor(frameColor, frameHSV, COLOR_RGB2HSV);
 
-            // Convert YCrCb to binary B&W
-            inRange(frameYCrCb, Scalar(Y_MIN, Cr_MIN, Cb_MIN), Scalar(Y_MAX, Cr_MAX, Cb_MAX), thresholdYCrCb);
-            // Convert HSV to binary B&W
-            inRange(frameHSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX), thresholdHSV);
+            //Start thread 1 that will handle the YCrCb color
+            thread YCrCbThread(trackYCrCbObjects, std::ref(frameColor), std::ref(threasholdYCrCb), std::ref(trackedYCrCb));
 
-            //Gaussian the black/white image for YCrCb
-            GaussianBlur(thresholdYCrCb, thresholdYCrCb, Size(3, 3), 0, 0);
-            //Gaussian the black/white image for HSV
-            GaussianBlur(thresholdHSV, thresholdHSV, Size(3, 3), 0, 0);
-            //Convert to grayscale
-            cvtColor(frameColor, gray, CV_BGR2GRAY);
-            //Gaussian the grey image
-            GaussianBlur(gray, gray, Size(3, 3), 0, 0);
+            //Start thread 2 that will handle the HSV color
+            thread HSVThread(trackHSVObjects, std::ref(frameColor), threasholdHSV, std::ref(trackedHSV));
+            
+            //Start thread 3 that will handle the circle detection
+            thread CircleThread(trackCircles, std::ref(frameColor), std::ref(trackedCircles));
 
-
-            //morphops the binary image
-            morphOps(thresholdYCrCb);
-            morphOps(thresholdHSV);
             try {
-
-                // Tracking objects from the image   
-                trackObjects(thresholdYCrCb, thresholdHSV, gray, trackedYCrCb, trackedHSV, trackedCircles);
+                YCrCbThread.join();
+                HSVThread.join();
+                CircleThread.join();
                 
 				//Match the filtered circles from YCrCb and HSV with eachother and set the prio
 				matchObjects(trackedYCrCb, trackedHSV, bothTemp, false);
@@ -895,14 +872,14 @@ int main(int argc, char** argv)
                     {
                         circle(frameColor, Point(lastPrio.at(i).getXPos(), lastPrio.at(i).getYPos()), lastPrio.at(i).getRadius(), Scalar(255,0,255), 2);
                     }
-                    /*for(int i = 0; i<trackedHSV.size(); ++i)
+                    for(int i = 0; i<trackedHSV.size(); ++i)
                     {
-                        circle(trackedHSV, Point(trackedHSV.at(i).getXPos(), trackedHSV.at(i).getYPos()), trackedHSV.at(i).getRadius(), Scalar(255,0,255));
+                        circle(frameColor, Point(trackedHSV.at(i).getXPos(), trackedHSV.at(i).getYPos()), trackedHSV.at(i).getRadius(), Scalar(255,0,255));
                     }
                     for(int i = 0; i<trackedYCrCb.size(); ++i)
                     {
                         circle(frameColor, Point(trackedYCrCb.at(i).getXPos(), trackedYCrCb.at(i).getYPos()), trackedYCrCb.at(i).getRadius(), Scalar(0,255,255));
-                    }*/
+                    }
                     printPrio(both, frameColor);
 				}
                 if(dflag >= 1)
@@ -925,12 +902,17 @@ int main(int argc, char** argv)
                 
 
                 // Display image
-                imshow("Image", frameColor);
-                //imshow("YCrCb image", ycrcbFrame);
-                //imshow("Binary image YCrCb", thresholdYCrCb);
-                //imshow("Binary image HSV", thresholdHSV);
-                //imshow("AND", thresholdHSV&thresholdYCrCb);
-                //imshow("Gray image", gray);
+                if(dflag >= 1)
+                {
+                    imshow("Image", frameColor);
+                    
+                }
+                if(dflag >=2){
+                    //imshow("YCrCb image", frameYCrCb);
+                    //imshow("HSV image", frameHSV);
+                    //imshow("AND", thresholdHSV&thresholdYCrCb);
+                    //imshow("Gray image", gray);
+                }
             }
             catch (cv::Exception & e)
             {
@@ -938,12 +920,16 @@ int main(int argc, char** argv)
             }
         }
         char k = waitKey(1);
-        if (k == 'q' || k == 'Q') break;
+        if (k == 'q' || k == 'Q')
+        {
+            loop = false;
+        }
         if (dflag>=1 && (k=='f' || k=='F')) printFPS=!printFPS;
     }
 
     return 0;
 }
+
 
 
 
