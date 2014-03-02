@@ -544,7 +544,7 @@ void calculatePlane(vector<Object> &objects, vector<double> &midPos, vector<doub
         double norZ = vect1.at(0)*vect2.at(1) - vect1.at(1)*vect2.at(0);
 
         //If the Z direction is negative, make it positive since we want the normal vector to point towards the camera at all times
-        if(norZ < 0)
+        if(norZ > 0)
         {
             norX *= -1;
             norY *= -1;
@@ -821,10 +821,10 @@ int main(int argc, char** argv)
     //For YCbCr filtering
     Y_MIN = 0;
     Y_MAX = 256;
-    Cr_MIN = 109;
-    Cr_MAX = 175;
-    Cb_MIN = 161;
-    Cb_MAX = 256;
+    Cr_MIN = 84;//109;
+    Cr_MAX = 130;//175;
+    Cb_MIN = 91;//161;
+    Cb_MAX = 112;//256;
     //For HSV filtering
     H_MIN = 112;
     H_MAX = 161;
@@ -867,7 +867,15 @@ int main(int argc, char** argv)
         // Start timer for fps counting
         startTime = getMilliCount();
     }
-
+	
+	//creat output for video saving
+    cam.read(frameColor);
+	cv::VideoWriter output;
+	output.open ( "testVideo.avi", CV_FOURCC('D','I','V','X'), 30, cv::Size (frameColor.cols,frameColor.rows), true );
+	if (!output.isOpened())
+	{
+        std::cout << "!!! Output video could not be opened" << std::endl;
+	}
 
     while (loop) {
         
@@ -902,7 +910,7 @@ int main(int argc, char** argv)
             GaussianBlur(frameColor, frameColor, Size(3, 3), 0, 0);
 
             //These can be used if threaded calculations is desired. Just dont forget to join (begining of try-block)
-            
+            /*
             //Start thread 1 that will handle the YCrCb color
             thread YCrCbThread(trackYCrCbObjects, std::ref(frameColor), std::ref(threasholdYCrCb), std::ref(trackedYCrCb));
 
@@ -911,16 +919,16 @@ int main(int argc, char** argv)
             
             //Start thread 3 that will handle the circle detection
             thread CircleThread(trackCircles, std::ref(frameColor), std::ref(trackedCircles));
-            /*
+            */
             trackObjects(frameColor, threasholdYCrCb, trackedYCrCb, CV_RGB2YCrCb, Scalar(Y_MIN, Cr_MIN, Cb_MIN), Scalar(Y_MAX, Cr_MAX, Cb_MAX));
             trackObjects(frameColor, threasholdHSV, trackedHSV, CV_RGB2HSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX));
             trackCircles(frameColor, trackedCircles);
-            */
+            
 
             try {
-                YCrCbThread.join();
-                HSVThread.join();
-                CircleThread.join();
+              //  YCrCbThread.join();
+              //  HSVThread.join();
+              //  CircleThread.join();
                 
 				//Match the filtered circles from YCrCb and HSV with eachother and set the prio
 				matchObjects(trackedYCrCb, trackedHSV, bothTemp, false);
@@ -952,7 +960,7 @@ int main(int argc, char** argv)
                     copyObject(both.at(2), lastPrio);
                 }
 
-                /*
+                
                 if(both.size() >= 3 && dflag >= 3)
                 {
                     Object temp = both.at(2);
@@ -978,7 +986,7 @@ int main(int argc, char** argv)
                     both.at(1) = temp2;
                     both.at(2) = temp3;
                 }
-                */
+                
 
                 calculatePlane(both, midPos, angles, frameColor, ballRadius, FOV, dflag);
 
@@ -991,11 +999,12 @@ int main(int argc, char** argv)
                         angleBuff.clear();
                         distanceBuff.clear();
                     }
-                    angleBuff.push_back(angles.at(1));
-                    distanceBuff.push_back(midPos.at(2));
 
-                    if(midPos.size() == 3)
+					if(midPos.size() == 3 && angles.size() == 3)
                     {
+						angleBuff.push_back(angles.at(1));
+						distanceBuff.push_back(midPos.at(2));
+
                         double distance = midPos.at(2);
                         int i = 0;
                         for(; i < distanceBuff.size(); ++i)
@@ -1008,18 +1017,15 @@ int main(int argc, char** argv)
                         }
                         putText(frameColor, "Dist to mid: " + std::to_string((int)distance) + " cm :D", cv::Point(50, 50), 1, 2, cv::Scalar(0, 255, 255), 2);
                         
-                    }
-                    if(angles.size() == 3)
-                    {
                         double angle = angles.at(2);
-                        int i = 0;
-                        for(; i < angleBuff.size(); ++i)
+                        int j = 0;
+                        for(; j < angleBuff.size(); ++j)
                         {
-                            angle += angleBuff.at(i);
+                            angle += angleBuff.at(j);
                         }
                         if(i > 0)
                         {
-                            angle /= i + 1;
+                            angle /= j + 1;
                         }
                         putText(frameColor, "angleY : " + std::to_string((int)angle) + " Degrees c:", cv::Point(50, 80), 1, 2, cv::Scalar(0, 255, 255), 2);
                     }
@@ -1036,7 +1042,7 @@ int main(int argc, char** argv)
 				//If in debug mode, print the prio to the screen
 				if(dflag >= 2)
 				{
-                    /*
+                    
                     for(int i = 0; i<trackedCircles.size(); ++i)
                     {
                         circle(frameColor, Point(trackedCircles.at(i).getXPos(), trackedCircles.at(i).getYPos()), trackedCircles.at(i).getRadius(), Scalar(255,255,0), 2);
@@ -1053,7 +1059,7 @@ int main(int argc, char** argv)
                     {
                         circle(frameColor, Point(trackedYCrCb.at(i).getXPos(), trackedYCrCb.at(i).getYPos()), trackedYCrCb.at(i).getRadius(), Scalar(0,255,255));
                     }
-                    printPrio(both, frameColor);*/
+                    printPrio(both, frameColor);
 				}
                 
                 
@@ -1063,6 +1069,7 @@ int main(int argc, char** argv)
                 if(dflag >= 1)
                 {
                     imshow(windowTitle, frameColor);
+					output.write(frameColor);
                     
                 }
                 if(dflag >=2){
@@ -1087,6 +1094,7 @@ int main(int argc, char** argv)
         if (k == 'q' || k == 'Q')
         {
             loop = false;
+			output.release();
         }
         if (dflag>=1 && (k=='f' || k=='F')) printFPS=!printFPS;
     }
