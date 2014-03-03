@@ -749,7 +749,7 @@ void trackObjects(Mat &frame, Mat &threashold, vector<Object> &foundObjects, int
 
 int main(int argc, char** argv)
 {
-    
+    string vflag = "";
     int dflag = 0;
     int cflag = 0;
     try
@@ -757,8 +757,10 @@ int main(int argc, char** argv)
         string desc = "This is the command description";
         CmdLine cmd(desc, ' ', "0.1");
         ValueArg<int> debug ("d", "debug", "Activate debug mode", false, 0, "int");
+        ValueArg<string> video ("v", "video", "Save video", false, "", "string");
         ValueArg<int> camera ("c", "camera", "Select camera", false, 0, "int");
         cmd.add( debug );
+        cmd.add( video );
         cmd.add( camera );
         // Parse arguments
         cmd.parse( argc, argv );
@@ -766,6 +768,7 @@ int main(int argc, char** argv)
         // Do what you intend too...
         cout << "Camera set is: "<< camera.getValue() << endl;
         dflag = debug.getValue();
+        vflag = video.getValue();
         cflag = camera.getValue();
     }
     catch ( ArgException& e )
@@ -774,7 +777,6 @@ int main(int argc, char** argv)
     }  
 
     VideoCapture cam(cflag);
-
 
     //Varibles for FPS counting
     int startTime;
@@ -869,12 +871,13 @@ int main(int argc, char** argv)
     }
 	
 	//creat output for video saving
-    cam.read(frameColor);
 	cv::VideoWriter output;
-	output.open ( "testVideo.avi", CV_FOURCC('D','I','V','X'), 30, cv::Size (frameColor.cols,frameColor.rows), true );
-	if (!output.isOpened())
-	{
-        std::cout << "!!! Output video could not be opened" << std::endl;
+	if(vflag.compare("")){
+		output.open ( vflag + ".avi", CV_FOURCC('D','I','V','X'), 30, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), true );
+		if (!output.isOpened())
+		{
+			std::cout << "!!! Output video could not be opened" << std::endl;
+		}
 	}
 
     while (loop) {
@@ -1069,8 +1072,6 @@ int main(int argc, char** argv)
                 if(dflag >= 1)
                 {
                     imshow(windowTitle, frameColor);
-					output.write(frameColor);
-                    
                 }
                 if(dflag >=2){
                     if(!threasholdYCrCb.empty())
@@ -1084,6 +1085,11 @@ int main(int argc, char** argv)
                     //imshow("AND", thresholdHSV&thresholdYCrCb);
                     //imshow("Gray image", gray);
                 }
+
+				if(vflag.compare(""))
+				{
+					output.write(frameColor);
+				}
             }
             catch (cv::Exception & e)
             {
