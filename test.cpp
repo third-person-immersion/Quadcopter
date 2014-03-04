@@ -28,8 +28,8 @@ using namespace TCLAP;
 using namespace cv;
 using namespace std;
 
-int MAX_DISTANCE_BETWEEN_CIRCLES = 25;
-int MIN_DISTANCE_BETWEEN_CIRCLES = 10;
+int MAX_DISTANCE_BETWEEN_CIRCLES = 55;
+int MIN_DISTANCE_BETWEEN_CIRCLES = 40;
 int MINAREA = 2000;
 int MAXAREA = 15000;
 int ERODE = 30;
@@ -49,6 +49,7 @@ int V_MAX = 256;
 int cP1 = 400; 
 int cP2 = 30; //cerist papper
 int maxHoughRadius = 80;
+int darkenFactor = 1;
 
 //Distance between the balls (lol)
 int ballDist = 20;
@@ -144,6 +145,7 @@ void createTrackbars(int number, char* min1, char* max1, char* min2, char* max2,
     createTrackbar("CIRCLE_PARAM_2", trackbarWindowName, &cP2, 100, on_trackbar);
     createTrackbar("CIRCLE_RADIUS", trackbarWindowName, &maxHoughRadius, 250, on_trackbar);
     createTrackbar("FOV", trackbarWindowName, &FOV, 100, on_trackbar);
+    createTrackbar("Darken", trackbarWindowName, &darkenFactor, 10, on_trackbar);
 }
 
 void morphOps(Mat &thresh){
@@ -322,14 +324,14 @@ void printPrio(vector<Object> &objects, Mat &frame)
         stringstream ss;
         ss << objects.at(i).getPrio();
         cv::putText(frame, ss.str(), cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()-40), 1, 1, cv::Scalar(0, 0, 170), 2);
-        cv::putText(frame, "Z: " + std::to_string(objects.at(i).getZDist()), cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()-20), 1, 1, cv::Scalar(0, 0, 255));
+        //cv::putText(frame, "Z: " + std::to_string(objects.at(i).getZDist()), cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()-20), 1, 1, cv::Scalar(0, 0, 255));
 
         if(i < 3 && objects.size() >= 3)
         {
             //avgDistance += objects.at(i).getZDist();
             int j = (i+1)%3;
             cv::line(frame, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), cv::Point(objects.at(j).getXPos(), objects.at(j).getYPos()),cv::Scalar(0, 0, 255), 1);
-            cv::circle(frame, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), objects.at(i).getRadius(), cv::Scalar(0, 0, 255));
+            //cv::circle(frame, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), objects.at(i).getRadius(), cv::Scalar(0, 0, 255));
         }
     }
     /*
@@ -427,12 +429,11 @@ void matchTriangles(vector<Object> &objects, vector< vector<int> > &neighborhood
 
 
 
-void trackCircles(Mat &frame, vector<Object> &tackedCircles) {
-    Mat gray;
+void trackCircles(Mat &frame, Mat& gray, vector<Object> &tackedCircles) {
     //Convert to grayscale
     cvtColor(frame, gray, CV_BGR2GRAY);
     //Gaussian the grey image
-    GaussianBlur(gray, gray, Size(3, 3), 0, 0);
+    //GaussianBlur(gray, gray, Size(3, 3), 0, 0);
     //A temporary list in which the detected circles will be until they are converted into a list of Object
     vector<Vec3f> circlesTemp;
     // Apply the Hough Transform to find the circles in the frame
@@ -533,7 +534,7 @@ void calculatePlane(vector<Object> &objects, vector<double> &midPos, vector<doub
         }
         if(dFlag >= 1)
         {
-            circle(frame, Point(frame.cols/2 + dist2Pix(midPos.at(0), objects.at(0).getRadius(), ballRadius), frame.rows/2 + dist2Pix(midPos.at(1), objects.at(0).getRadius(), ballRadius)), 3, cv::Scalar(0, 0, 0), 3);
+            circle(frame, Point(frame.cols/2 + dist2Pix(midPos.at(0), objects.at(0).getRadius(), ballRadius), frame.rows/2 + dist2Pix(midPos.at(1), objects.at(0).getRadius(), ballRadius)), 3, cv::Scalar(0, 255, 255), 3);
         }
         
         
@@ -657,7 +658,7 @@ void matchLast(vector<Object> &last, vector<Object> &dst)
                 dst.at(i).getYPos() - dst.at(i).getRadius() <= last.at(j).getYPos() && last.at(j).getYPos() <= dst.at(i).getYPos() + dst.at(i).getRadius() &&
                 checkRadiusRatio(dst.at(i), last.at(j), 2))
             {
-                dst.at(i).incPrio(20);
+                dst.at(i).incPrio(30);
             }
         }
     }
@@ -747,6 +748,15 @@ void trackObjects(Mat &frame, Mat &threashold, vector<Object> &foundObjects, int
 	findObjects(frameThreshold, foundObjects);
 }
 
+void darkenMatrix(Mat &frame)
+{
+    frame.convertTo(frame, CV_32FC3);
+    for(int y=0; y<frame.rows; y++)
+        for(int x=0; x<frame.cols; x++)
+            for(int c=0;c<3;c++)
+            frame.at<Vec3f>(y,x)[c] = (darkenFactor/10.0)*pow(frame.at<Vec3f>(y,x)[c]/255.0,3);
+}
+
 int main(int argc, char** argv)
 {
     string vflag = "";
@@ -783,6 +793,7 @@ int main(int argc, char** argv)
     int endTime;
     double fps;
     bool printFPS = false;
+    bool writeVideo = false;
     bool loop = true;
 
 
@@ -794,7 +805,7 @@ int main(int argc, char** argv)
     }
 
     //Colored frames
-    Mat frameColor, threasholdYCrCb, threasholdHSV;
+    Mat frameColor, frameGray, threasholdYCrCb, threasholdHSV, frameColorDark;
 
 
 	vector<Object> trackedYCrCb;
@@ -823,10 +834,10 @@ int main(int argc, char** argv)
     //For YCbCr filtering
     Y_MIN = 0;
     Y_MAX = 256;
-    Cr_MIN = 84;//109;
-    Cr_MAX = 130;//175;
-    Cb_MIN = 91;//161;
-    Cb_MAX = 112;//256;
+    Cr_MIN = 109;
+    Cr_MAX = 175;
+    Cb_MIN = 161;
+    Cb_MAX = 256;
     //For HSV filtering
     H_MIN = 112;
     H_MAX = 161;
@@ -837,14 +848,15 @@ int main(int argc, char** argv)
     //Same for both color filters
     MINAREA = 100;
     MAXAREA = 30000;
-    cP1 = 137;
-    cP2 = 20;
-    maxHoughRadius = 110;
+    cP1 = 90;
+    cP2 = 12;
+    maxHoughRadius = 80;
     ERODE = 1;
     DILATE = 1; 
     
     string windowYCrCb = "YCrCb image";
     string windowHSV = "HSV image";
+    string windowGray = "Gray image";
 
     if(dflag >= 1)
     {
@@ -861,6 +873,7 @@ int main(int argc, char** argv)
             
             namedWindow(windowYCrCb, CV_WINDOW_AUTOSIZE );
             namedWindow(windowHSV, CV_WINDOW_AUTOSIZE );
+            namedWindow(windowGray, CV_WINDOW_AUTOSIZE );
         }
         
         //Create window
@@ -871,15 +884,34 @@ int main(int argc, char** argv)
     }
 	
 	//creat output for video saving
-	cv::VideoWriter output;
+	cv::VideoWriter outputColor, outputHSV, outputYCrCb, outputGray;
     if(!vflag.empty()){
         cout << "Videoflag set! filename: " << vflag << "\n";
-		output.open ( vflag + ".avi", CV_FOURCC('D','I','V','X'), 30, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), true );
-		if (!output.isOpened())
+
+		outputColor.open ( vflag + "Color.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), true );
+		outputHSV.open ( vflag + "HSV.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), false );
+		outputYCrCb.open ( vflag + "YCrCb.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), false );
+		outputGray.open ( vflag + "Gray.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), false );
+
+		if (!outputColor.isOpened())
 		{
-			std::cout << "!!! Output video could not be opened" << std::endl;
+			std::cout << "Output frameColor could not be opened\n";
+		}
+        if (!outputHSV.isOpened())
+		{
+			std::cout << "Output thresholdHSV could not be opened\n";
+		}
+        if (!outputYCrCb.isOpened())
+		{
+			std::cout << "Output thresholdYCrCb could not be opened\n";
+		}
+        if (!outputGray.isOpened())
+		{
+			std::cout << "Output gray could not be opened\n";
 		}
 	}
+
+    vector<Mat> channels;
 
     while (loop) {
         
@@ -913,8 +945,22 @@ int main(int argc, char** argv)
             // Blur the image a bit
             GaussianBlur(frameColor, frameColor, Size(3, 3), 0, 0);
 
+            //Darken image
+            /*
+            frameColor.convertTo(frameColorDark, CV_32F);
+            for(int y=0; y<frameColorDark.rows; y++)
+               for(int x=0; x<frameColorDark.cols; x++)
+                 for(int c=0;c<3;c++)
+                    frameColorDark.at<Vec3f>(y,x)[c] = (darkenFactor/10.0)*pow(frameColorDark.at<Vec3f>(y,x)[c]/255.0,3);
+                    
+            cvtColor(frameColor, frameColorDark, CV_RGB2YCrCb);
+            split(frameColorDark, channels);
+            darkenMatrix(channels.at(0));
+            merge(channels, frameColorDark);*/
+
             //These can be used if threaded calculations is desired. Just dont forget to join (begining of try-block)
             
+            /*
             //Start thread 1 that will handle the YCrCb color
             thread YCrCbThread(trackYCrCbObjects, std::ref(frameColor), std::ref(threasholdYCrCb), std::ref(trackedYCrCb));
 
@@ -923,17 +969,17 @@ int main(int argc, char** argv)
             
             //Start thread 3 that will handle the circle detection
             thread CircleThread(trackCircles, std::ref(frameColor), std::ref(trackedCircles));
-            /*
+            */
             trackObjects(frameColor, threasholdYCrCb, trackedYCrCb, CV_RGB2YCrCb, Scalar(Y_MIN, Cr_MIN, Cb_MIN), Scalar(Y_MAX, Cr_MAX, Cb_MAX));
             trackObjects(frameColor, threasholdHSV, trackedHSV, CV_RGB2HSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX));
-            trackCircles(frameColor, trackedCircles);*/
-            
+            trackCircles(frameColor, frameGray, trackedCircles);
+
 
             try
             {
-                YCrCbThread.join();
-                HSVThread.join();
-                CircleThread.join();
+                //YCrCbThread.join();
+                //HSVThread.join();
+                //CircleThread.join();
                 
 				//Match the filtered circles from YCrCb and HSV with eachother and set the prio
 				matchObjects(trackedYCrCb, trackedHSV, bothTemp, false);
@@ -1047,14 +1093,13 @@ int main(int argc, char** argv)
 				//If in debug mode, print the prio to the screen
 				if(dflag >= 2)
 				{
-                    
+                    for(int i = 0; i<lastPrio.size(); ++i)
+                    {
+                        circle(frameColor, Point(lastPrio.at(i).getXPos(), lastPrio.at(i).getYPos()), lastPrio.at(i).getRadius(), Scalar(150, 0, 0), 3);
+                    }
                     for(int i = 0; i<trackedCircles.size(); ++i)
                     {
                         circle(frameColor, Point(trackedCircles.at(i).getXPos(), trackedCircles.at(i).getYPos()), trackedCircles.at(i).getRadius(), Scalar(255,255,0), 2);
-                    }
-                    for(int i = 0; i<lastPrio.size(); ++i)
-                    {
-                        circle(frameColor, Point(lastPrio.at(i).getXPos(), lastPrio.at(i).getYPos()), lastPrio.at(i).getRadius(), Scalar(255,0,255), 2);
                     }
                     for(int i = 0; i<trackedHSV.size(); ++i)
                     {
@@ -1084,13 +1129,22 @@ int main(int argc, char** argv)
                     {
                         imshow(windowHSV, threasholdHSV);
                     }
-                    //imshow("AND", thresholdHSV&thresholdYCrCb);
-                    //imshow("Gray image", gray);
+                    if(!frameGray.empty())
+                    {
+                        imshow(windowGray, frameGray);
+                    }
+                    if(!frameColorDark.empty())
+                    {
+                        imshow("Dark", frameColorDark);
+                    }
                 }
 
-                if(!vflag.empty())
+                if(!vflag.empty() && writeVideo)
 				{
-					output.write(frameColor);
+                    outputColor.write(frameColor);
+                    outputHSV.write(threasholdHSV);
+                    outputYCrCb.write(threasholdYCrCb);
+                    outputGray.write(frameGray);
 				}
             }
             catch (cv::Exception & e)
@@ -1102,9 +1156,13 @@ int main(int argc, char** argv)
         if (k == 'q' || k == 'Q')
         {
             loop = false;
-			output.release();
+            outputColor.release();
+            outputHSV.release();
+            outputYCrCb.release();
+            outputGray.release();
         }
         if (dflag>=1 && (k=='f' || k=='F')) printFPS=!printFPS;
+        if (dflag>=1 && !vflag.empty() && (k=='v' || k=='V')) writeVideo=!writeVideo;
     }
 
     return 0;
