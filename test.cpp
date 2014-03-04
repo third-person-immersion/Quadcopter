@@ -872,7 +872,8 @@ int main(int argc, char** argv)
 	
 	//creat output for video saving
 	cv::VideoWriter output;
-	if(vflag.compare("")){
+    if(!vflag.empty()){
+        cout << "Videoflag set! filename: " << vflag << "\n";
 		output.open ( vflag + ".avi", CV_FOURCC('D','I','V','X'), 30, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), true );
 		if (!output.isOpened())
 		{
@@ -913,7 +914,7 @@ int main(int argc, char** argv)
             GaussianBlur(frameColor, frameColor, Size(3, 3), 0, 0);
 
             //These can be used if threaded calculations is desired. Just dont forget to join (begining of try-block)
-            /*
+            
             //Start thread 1 that will handle the YCrCb color
             thread YCrCbThread(trackYCrCbObjects, std::ref(frameColor), std::ref(threasholdYCrCb), std::ref(trackedYCrCb));
 
@@ -922,16 +923,17 @@ int main(int argc, char** argv)
             
             //Start thread 3 that will handle the circle detection
             thread CircleThread(trackCircles, std::ref(frameColor), std::ref(trackedCircles));
-            */
+            /*
             trackObjects(frameColor, threasholdYCrCb, trackedYCrCb, CV_RGB2YCrCb, Scalar(Y_MIN, Cr_MIN, Cb_MIN), Scalar(Y_MAX, Cr_MAX, Cb_MAX));
             trackObjects(frameColor, threasholdHSV, trackedHSV, CV_RGB2HSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX));
-            trackCircles(frameColor, trackedCircles);
+            trackCircles(frameColor, trackedCircles);*/
             
 
-            try {
-              //  YCrCbThread.join();
-              //  HSVThread.join();
-              //  CircleThread.join();
+            try
+            {
+                YCrCbThread.join();
+                HSVThread.join();
+                CircleThread.join();
                 
 				//Match the filtered circles from YCrCb and HSV with eachother and set the prio
 				matchObjects(trackedYCrCb, trackedHSV, bothTemp, false);
@@ -1086,7 +1088,7 @@ int main(int argc, char** argv)
                     //imshow("Gray image", gray);
                 }
 
-				if(vflag.compare(""))
+                if(!vflag.empty())
 				{
 					output.write(frameColor);
 				}
