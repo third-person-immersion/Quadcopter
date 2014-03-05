@@ -729,7 +729,7 @@ void trackYCrCbObjects(Mat &frame, Mat &threashold, vector<Object> &foundObjects
 	findObjects(frameThreshold, foundObjects);
 }
 
-void trackObjects(Mat &frame, Mat &threashold, vector<Object> &foundObjects, int code, Scalar &scalarMin, Scalar &scalarMax)
+void trackObjects(Mat &frame, Mat &threashold, vector<Object> &foundObjects, int code, Scalar scalarMin, Scalar scalarMax)
 {
     Mat target;
 	//Black and white frames
