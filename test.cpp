@@ -28,6 +28,10 @@ using namespace TCLAP;
 using namespace cv;
 using namespace std;
 
+//Delimiters
+char DELIMITER_GROUP = 29;
+char DELIMITER_RECORD = 30;
+
 int MAX_DISTANCE_BETWEEN_CIRCLES = 55;
 int MIN_DISTANCE_BETWEEN_CIRCLES = 40;
 int MINAREA = 2000;
@@ -762,6 +766,7 @@ int main(int argc, char** argv)
     string vflag = "";
     int dflag = 0;
     int cflag = 0;
+    int rflag = 0;
     try
     {
         string desc = "This is the command description";
@@ -769,23 +774,30 @@ int main(int argc, char** argv)
         ValueArg<int> debug ("d", "debug", "Activate debug mode", false, 0, "int");
         ValueArg<string> video ("v", "video", "Save video", false, "", "string");
         ValueArg<int> camera ("c", "camera", "Select camera", false, 0, "int");
+        ValueArg<int> release ("r", "release", "Activate release mode", false, 0, "int");
         cmd.add( debug );
         cmd.add( video );
         cmd.add( camera );
+        cmd.add( release );
         // Parse arguments
         cmd.parse( argc, argv );
     
         // Do what you intend too...
-        cout << "Camera set is: "<< camera.getValue() << endl;
         dflag = debug.getValue();
         vflag = video.getValue();
         cflag = camera.getValue();
+        rflag = release.getValue();
     }
     catch ( ArgException& e )
     {
         cout << "ERROR: " << e.error() << " " << e.argId() << endl;
+        return 1;
     }  
 
+    if(dflag >= 1 && rflag <= 0)
+    {
+        cout << "Camera set is: "<< cflag << endl;
+    }
     VideoCapture cam(cflag);
 
     //Varibles for FPS counting
@@ -799,9 +811,13 @@ int main(int argc, char** argv)
 
     if (!cam.isOpened()) {
         cout << "Error loading camera";
+        return 1;
     }
     else {
-        cout << "Camera loaded OK\n\n";
+        if(dflag >= 1 && rflag <= 0)
+        {
+            cout << "Camera loaded OK\n\n";
+        }
     }
 
     //Colored frames
@@ -860,8 +876,11 @@ int main(int argc, char** argv)
 
     if(dflag >= 1)
     {
-        cout << "Debug mode is ON and set to: " << dflag << "\n";
-        cout << "Press F to see FPS in console. Press Q to quit.\n";
+        if(rflag <= 0)
+        {
+            cout << "Debug mode is ON and set to: " << dflag << "\n";
+            cout << "Press F to see FPS in console. Press Q to quit.\n";
+        }
 
         if(dflag >= 2)
         {
@@ -869,7 +888,11 @@ int main(int argc, char** argv)
             createTrackbars(1, "Y_MIN", "Y_MAX", "Cr_MIN", "Cr_MAX", "Cb_MIN", "Cb_MAX", &Y_MIN, &Y_MAX, &Cr_MIN, &Cr_MAX, &Cb_MIN, &Cb_MAX);
             createTrackbars(2, "H_MIN", "H_MAX", "S_MIN", "S_MAX", "V_MIN", "V_MAX", &H_MIN, &H_MAX, &S_MIN, &S_MAX, &V_MIN, &V_MAX);
 
-            cout << "Starting to capture!\nBall radius set to: " << ballRadius << "\n";
+            if(rflag <= 0)
+            {
+                cout << "Starting to capture!\nBall radius set to: " << ballRadius << "\n";
+            }
+            
             
             namedWindow(windowYCrCb, CV_WINDOW_AUTOSIZE );
             namedWindow(windowHSV, CV_WINDOW_AUTOSIZE );
@@ -886,28 +909,31 @@ int main(int argc, char** argv)
 	//creat output for video saving
 	cv::VideoWriter outputColor, outputHSV, outputYCrCb, outputGray;
     if(!vflag.empty()){
-        cout << "Videoflag set! filename: " << vflag << "\n";
+        if(dflag >= 1 && rflag <= 0)
+        {
+            cout << "Videoflag set! filename: " << vflag << "\n";
+        }
 
 		outputColor.open ( vflag + "Color.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), true );
 		outputHSV.open ( vflag + "HSV.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), false );
 		outputYCrCb.open ( vflag + "YCrCb.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), false );
 		outputGray.open ( vflag + "Gray.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), false );
 
-		if (!outputColor.isOpened())
+		if (!outputColor.isOpened() && dflag >= 1 && rflag <= 0)
 		{
-			std::cout << "Output frameColor could not be opened\n";
+			cout << "Output frameColor could not be opened\n";
 		}
-        if (!outputHSV.isOpened())
+        if (!outputHSV.isOpened() && dflag >= 1 && rflag <= 0)
 		{
-			std::cout << "Output thresholdHSV could not be opened\n";
+			cout << "Output thresholdHSV could not be opened\n";
 		}
-        if (!outputYCrCb.isOpened())
+        if (!outputYCrCb.isOpened() && dflag >= 1 && rflag <= 0)
 		{
-			std::cout << "Output thresholdYCrCb could not be opened\n";
+			cout << "Output thresholdYCrCb could not be opened\n";
 		}
-        if (!outputGray.isOpened())
+        if (!outputGray.isOpened() && dflag >= 1 && rflag <= 0)
 		{
-			std::cout << "Output gray could not be opened\n";
+			cout << "Output gray could not be opened\n";
 		}
 	}
 
@@ -934,7 +960,7 @@ int main(int argc, char** argv)
             double milliSpan = (double)getMilliSpan(startTime) / 1000;
 
             fps = 1 / milliSpan;
-            if (printFPS) {
+            if (printFPS && rflag <= 0) {
                 cout << "FPS: " << fps << "\n";
             }
             startTime = getMilliCount();
@@ -1043,6 +1069,19 @@ int main(int argc, char** argv)
 
                 //HERE WE HAVE OUR AWESOME VALUES. THEY LAY IN midPos AND angles!! OMG ERMAHGERD!
 
+                if(rflag == 1)
+                {
+                    cout << "1" << DELIMITER_RECORD << "0" << DELIMITER_GROUP << midPos[2] << endl;
+                }
+                else if(rflag == 2)
+                {
+                    cout << "3" << DELIMITER_RECORD << "0" << DELIMITER_GROUP << midPos[0] << DELIMITER_RECORD << midPos[1] << DELIMITER_RECORD << midPos[2] << endl;
+                }
+                else if(rflag == 3)
+                {
+                    cout << "3" << DELIMITER_RECORD << "3" << DELIMITER_GROUP << midPos[0] << DELIMITER_RECORD << midPos[1] << DELIMITER_RECORD << midPos[2] << DELIMITER_GROUP << angles[0] << DELIMITER_RECORD << angles[1] << DELIMITER_RECORD << angles[2] << endl;
+                }
+
                 if(dflag >= 1)
                 {
                     if(angleBuff.size() > 50)
@@ -1150,6 +1189,7 @@ int main(int argc, char** argv)
             catch (cv::Exception & e)
             {
                 cout << e.what() << endl;
+                return 1;
             }
         }
         char k = waitKey(1);
