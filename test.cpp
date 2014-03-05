@@ -767,6 +767,7 @@ int main(int argc, char** argv)
     int dflag = 0;
     int cflag = 0;
     int rflag = 0;
+    int distflag = 0;
     try
     {
         string desc = "This is the command description";
@@ -775,10 +776,12 @@ int main(int argc, char** argv)
         ValueArg<string> video ("v", "video", "Save video", false, "", "string");
         ValueArg<int> camera ("c", "camera", "Select camera", false, 0, "int");
         ValueArg<int> release ("r", "release", "Activate release mode", false, 0, "int");
+        ValueArg<int> distance ("s", "distance", "Set the desired distance", false, 0, "int");
         cmd.add( debug );
         cmd.add( video );
         cmd.add( camera );
         cmd.add( release );
+        cmd.add( distance );
         // Parse arguments
         cmd.parse( argc, argv );
     
@@ -787,6 +790,7 @@ int main(int argc, char** argv)
         vflag = video.getValue();
         cflag = camera.getValue();
         rflag = release.getValue();
+        distflag = distance.getValue();
     }
     catch ( ArgException& e )
     {
@@ -1126,7 +1130,22 @@ int main(int argc, char** argv)
                     
                     //FPS
                     putText(frameColor,"FPS: "+std::to_string(fps),Point(50,130), 1, 1.2, cv::Scalar(0, 255, 255), 1);
+
+                    //test distance
+                    if(distflag > 0)
+                    {
+                        if(midPos[2] > distflag)
+                        {
+                            putText(frameColor,"Move forward!",Point(50,150), 1, 1.2, cv::Scalar(0, 255, 255), 1);
+                        }
+                        else 
+                        {
+                            putText(frameColor,"Move backwards!",Point(50,150), 1, 1.2, cv::Scalar(0, 255, 255), 1);
+                        }
+                    }
                     
+                    
+
                 }
 				
 				//If in debug mode, print the prio to the screen
