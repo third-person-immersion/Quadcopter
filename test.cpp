@@ -32,8 +32,8 @@ using namespace std;
 char DELIMITER_GROUP = 29;
 char DELIMITER_RECORD = 30;
 
-int MAX_DISTANCE_BETWEEN_CIRCLES = 55;
-int MIN_DISTANCE_BETWEEN_CIRCLES = 40;
+int MAX_DISTANCE_BETWEEN_CIRCLES = 25;//55;
+int MIN_DISTANCE_BETWEEN_CIRCLES = 10;//40;
 int MINAREA = 2000;
 int MAXAREA = 15000;
 int ERODE = 30;
@@ -111,7 +111,7 @@ void createTrackbars(int number, char* min1, char* max1, char* min2, char* max2,
     sstm << "Trackbars" << number;
     string trackbarWindowName = sstm.str();
     //create window for trackbars
-    namedWindow(trackbarWindowName, 0);
+    cv::namedWindow(trackbarWindowName, 0);
     //create memory to store trackbar name on window
     char TrackbarName[50];
     /*
@@ -433,9 +433,13 @@ void matchTriangles(vector<Object> &objects, vector< vector<int> > &neighborhood
 
 
 
-void trackCircles(Mat &frame, Mat& gray, vector<Object> &tackedCircles) {
+void trackCircles(Mat &frame, Mat& gray, vector<Object> &tackedCircles, bool convertToGray) {
     //Convert to grayscale
-    cvtColor(frame, gray, CV_BGR2GRAY);
+    if(convertToGray)
+    {
+        cvtColor(frame, gray, CV_BGR2GRAY);
+    }
+    
     //Gaussian the grey image
     //GaussianBlur(gray, gray, Size(3, 3), 0, 0);
     //A temporary list in which the detected circles will be until they are converted into a list of Object
@@ -825,18 +829,22 @@ int main(int argc, char** argv)
     }
 
     //Colored frames
-    Mat frameColor, frameGray, threasholdYCrCb, threasholdHSV, frameColorDark;
+    Mat frameColor, frameGray, threasholdYCrCb, threasholdHSV, frameColorDark, frameGrayThresholdYCrCb, frameGrayThresholdHSV;
 
 
 	vector<Object> trackedYCrCb;
     vector<Object> trackedHSV;
 	vector<Object> trackedCircles;
+	vector<Object> trackedCirclesYCrCb;
+	vector<Object> trackedCirclesHSV;
 	vector<Object> both;
 	vector<Object> bothTemp;
     vector<Object> lastPrio;
     vector< vector<int> > neighborhood;
     vector<double> angleBuff;
     vector<double> distanceBuff;
+
+    vector<Object> tempVector;
 
     /********************************************************************\
     **    HERE IS THE ACTUAL DATA WE NEED TO POSITION THE QUADCOPTER    **
@@ -854,14 +862,14 @@ int main(int argc, char** argv)
     //For YCbCr filtering
     Y_MIN = 0;
     Y_MAX = 256;
-    Cr_MIN = 109;
-    Cr_MAX = 175;
-    Cb_MIN = 161;
+    Cr_MIN = 0;
+    Cr_MAX = 2556;
+    Cb_MIN = 146;
     Cb_MAX = 256;
     //For HSV filtering
-    H_MIN = 112;
-    H_MAX = 161;
-    S_MIN = 142;
+    H_MIN = 109;
+    H_MAX = 256;
+    S_MIN = 89;
     S_MAX = 256;
     V_MIN = 0;
     V_MAX = 256;
@@ -877,6 +885,8 @@ int main(int argc, char** argv)
     string windowYCrCb = "YCrCb image";
     string windowHSV = "HSV image";
     string windowGray = "Gray image";
+    string windowYCrCb2 = "YCrCb image 2";
+    string windowHSV2 = "HSV image 2";
 
     if(dflag >= 1)
     {
@@ -898,13 +908,16 @@ int main(int argc, char** argv)
             }
             
             
-            namedWindow(windowYCrCb, CV_WINDOW_AUTOSIZE );
-            namedWindow(windowHSV, CV_WINDOW_AUTOSIZE );
-            namedWindow(windowGray, CV_WINDOW_AUTOSIZE );
+            cv::namedWindow(windowYCrCb, CV_WINDOW_AUTOSIZE );
+            cv::namedWindow(windowHSV, CV_WINDOW_AUTOSIZE );
+            cv::namedWindow(windowGray, CV_WINDOW_AUTOSIZE );
+            
+            cv::namedWindow(windowYCrCb2, CV_WINDOW_AUTOSIZE );
+            cv::namedWindow(windowHSV2, CV_WINDOW_AUTOSIZE );
         }
         
         //Create window
-        namedWindow(windowTitle, CV_WINDOW_FREERATIO );
+        cv::namedWindow(windowTitle, CV_WINDOW_FREERATIO );
 
         // Start timer for fps counting
         startTime = getMilliCount();
@@ -954,6 +967,8 @@ int main(int argc, char** argv)
         neighborhood.clear();
         midPos.clear();
         angles.clear();
+
+        //tempVector.clear();
         
         //read the frame from the camera
         cam.read(frameColor);
@@ -1002,8 +1017,14 @@ int main(int argc, char** argv)
             */
             trackObjects(frameColor, threasholdYCrCb, trackedYCrCb, CV_RGB2YCrCb, Scalar(Y_MIN, Cr_MIN, Cb_MIN), Scalar(Y_MAX, Cr_MAX, Cb_MAX));
             trackObjects(frameColor, threasholdHSV, trackedHSV, CV_RGB2HSV, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX));
-            trackCircles(frameColor, frameGray, trackedCircles);
+            trackCircles(frameColor, frameGray, trackedCircles, true);
 
+            /*
+            threasholdYCrCb.copyTo(frameGrayThresholdYCrCb);
+            threasholdHSV.copyTo(frameGrayThresholdHSV);
+            trackCircles(threasholdYCrCb, frameGrayThresholdYCrCb, trackedCirclesYCrCb, false);
+            trackCircles(threasholdHSV, frameGrayThresholdHSV, trackedCirclesHSV, false);
+            */
 
             try
             {
@@ -1012,8 +1033,16 @@ int main(int argc, char** argv)
                 //CircleThread.join();
                 
 				//Match the filtered circles from YCrCb and HSV with eachother and set the prio
-				matchObjects(trackedYCrCb, trackedHSV, bothTemp, false);
+				//matchObjects(trackedYCrCb, trackedHSV, bothTemp, false);
+				//matchObjects(bothTemp, trackedCircles, both, true);
+
+                
+                //matchObjects(trackedYCrCb, trackedCirclesYCrCb, tempVector, false);
+                //matchObjects(trackedHSV, trackedCirclesHSV, tempVector, false);
+                
+                matchObjects(trackedYCrCb, trackedHSV, bothTemp, false);
 				matchObjects(bothTemp, trackedCircles, both, true);
+
                 //If there is three objects from the previous loop
                 if(lastPrio.size() == 3)
                 {
@@ -1075,15 +1104,15 @@ int main(int argc, char** argv)
 
                 if(rflag == 1)
                 {
-                    cout << "1" << DELIMITER_RECORD << "0" << DELIMITER_GROUP << midPos[2] << endl;
+                    cout << midPos[2] << endl;
                 }
                 else if(rflag == 2)
                 {
-                    cout << "3" << DELIMITER_RECORD << "0" << DELIMITER_GROUP << midPos[0] << DELIMITER_RECORD << midPos[1] << DELIMITER_RECORD << midPos[2] << endl;
+                    cout << midPos[0] << DELIMITER_RECORD << midPos[1] << DELIMITER_RECORD << midPos[2] << endl;
                 }
                 else if(rflag == 3)
                 {
-                    cout << "3" << DELIMITER_RECORD << "3" << DELIMITER_GROUP << midPos[0] << DELIMITER_RECORD << midPos[1] << DELIMITER_RECORD << midPos[2] << DELIMITER_GROUP << angles[0] << DELIMITER_RECORD << angles[1] << DELIMITER_RECORD << angles[2] << endl;
+                    cout << midPos[0] << DELIMITER_RECORD << midPos[1] << DELIMITER_RECORD << midPos[2] << DELIMITER_GROUP << angles[0] << DELIMITER_RECORD << angles[1] << DELIMITER_RECORD << angles[2] << endl;
                 }
 
                 if(dflag >= 1)
@@ -1195,6 +1224,14 @@ int main(int argc, char** argv)
                     {
                         imshow("Dark", frameColorDark);
                     }
+                    /*if(!frameGrayThresholdHSV.empty())
+                    {
+                        imshow(windowHSV2, frameGrayThresholdHSV);
+                    }
+                    if(!frameGrayThresholdYCrCb.empty())
+                    {
+                        imshow(windowYCrCb2, frameGrayThresholdYCrCb);
+                    }*/
                 }
 
                 if(!vflag.empty() && writeVideo)
