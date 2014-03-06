@@ -1,4 +1,4 @@
-// OpenCV webcam test.cpp : Defines the entry point for the console application.
+ï»¿// OpenCV webcam test.cpp : Defines the entry point for the console application.
 //
 
 //#include "stdafx.h"
@@ -380,7 +380,7 @@ void createPairsByDistance(vector<Object> &objects, vector< vector<int> > &neigh
             if(MIN_DISTANCE_BETWEEN_CIRCLES <= distance && distance <= MAX_DISTANCE_BETWEEN_CIRCLES)
             {
                 neighbors.push_back(j);
-                //Här ritas avståndslinjer ut
+                //HÃ¤r ritas avstÃ¥ndslinjer ut
                 //cv::line(frame, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), cv::Point(objects.at(j).getXPos(), objects.at(j).getYPos()),cv::Scalar(255, 255, 0), 3);
             }
 
@@ -813,7 +813,7 @@ int main(int argc, char** argv)
     int endTime;
     double fps;
     bool printFPS = false;
-    bool writeVideo = false;
+    bool writeVideo = true;
     bool loop = true;
 
 
@@ -857,7 +857,7 @@ int main(int argc, char** argv)
 
     /** Microsoft webcam
         cerisa bollar
-        YCbCr färger och HSV färger*/
+        YCbCr fÃ¤rger och HSV fÃ¤rger*/
 
     //For YCbCr filtering
     Y_MIN = 0;
@@ -1112,6 +1112,7 @@ int main(int argc, char** argv)
                 }
                 else if(rflag == 3)
                 {
+                    
                     cout << midPos[0] << DELIMITER_RECORD << midPos[1] << DELIMITER_RECORD << midPos[2] << DELIMITER_GROUP << angles[0] << DELIMITER_RECORD << angles[1] << DELIMITER_RECORD << angles[2] << endl;
                 }
 
@@ -1128,52 +1129,17 @@ int main(int argc, char** argv)
 						angleBuff.push_back(angles.at(1));
 						distanceBuff.push_back(midPos.at(2));
 
-                        double distance = midPos.at(2);
-                        int i = 0;
-                        for(; i < distanceBuff.size(); ++i)
-                        {
-                            distance += distanceBuff.at(i);
-                        }
-                        if(i > 0)
-                        {
-                            distance /= i + 1;
-                        }
-                        putText(frameColor, "Dist to mid: " + std::to_string((int)distance) + " cm :D", cv::Point(50, 50), 1, 2, cv::Scalar(0, 255, 255), 2);
+                        putText(frameColor, "Distance X: " + std::to_string((int)midPos.at(0)) + " cm", cv::Point(30, 30), 1, 1.6, cv::Scalar(0, 255, 255), 2);
+                        putText(frameColor, "Distance Y: " + std::to_string((int)midPos.at(1)) + " cm", cv::Point(30, 55), 1, 1.6, cv::Scalar(0, 255, 255), 2);
+                        putText(frameColor, "Distance Z: " + std::to_string((int)midPos.at(2)) + " cm", cv::Point(30, 80), 1, 1.6, cv::Scalar(0, 255, 255), 2);
                         
-                        double angle = angles.at(2);
-                        int j = 0;
-                        for(; j < angleBuff.size(); ++j)
-                        {
-                            angle += angleBuff.at(j);
-                        }
-                        if(i > 0)
-                        {
-                            angle /= j + 1;
-                        }
-                        putText(frameColor, "angleY : " + std::to_string((int)angle) + " Degrees c:", cv::Point(50, 80), 1, 2, cv::Scalar(0, 255, 255), 2);
-                    }
-                    if(both.size() >= 3)
-                    {
-                        putText(frameColor, "Objects found", cv::Point(50, 100), 1, 1.3, cv::Scalar(0, 255, 255), 2);
+                        putText(frameColor, "Pitch: " + std::to_string((int)angles.at(1)), cv::Point(30, 110), 1, 1.4, cv::Scalar(0, 255, 255), 2);
+                        putText(frameColor, "Roll:  " + std::to_string((int)angles.at(2)), cv::Point(30, 130), 1, 1.4, cv::Scalar(0, 255, 255), 2);
+                        putText(frameColor, "Yaw:   " + std::to_string((int)angles.at(0)), cv::Point(30, 150), 1, 1.4, cv::Scalar(0, 255, 255), 2);
                     }
                     
                     //FPS
-                    putText(frameColor,"FPS: "+std::to_string(fps),Point(50,130), 1, 1.2, cv::Scalar(0, 255, 255), 1);
-
-                    //test distance
-                    if(distflag > 0)
-                    {
-                        if(midPos[2] > distflag)
-                        {
-                            putText(frameColor,"Move forward!",Point(50,150), 1, 1.2, cv::Scalar(0, 255, 255), 1);
-                        }
-                        else 
-                        {
-                            putText(frameColor,"Move backwards!",Point(50,150), 1, 1.2, cv::Scalar(0, 255, 255), 1);
-                        }
-                    }
-                    
-                    
+                    putText(frameColor,"FPS: "+std::to_string(fps),Point(30,180), 1, 1.2, cv::Scalar(0, 255, 255), 1);
 
                 }
 				
