@@ -11,6 +11,7 @@
 #include <stdio.h>
 //#include <unistd.h>
 #include <thread>
+#include <iterator>
 #include "Object.h"
 
 
@@ -32,8 +33,8 @@ using namespace std;
 char DELIMITER_GROUP = 29;
 char DELIMITER_RECORD = 30;
 
-int MAX_DISTANCE_BETWEEN_CIRCLES = 25;//55;
-int MIN_DISTANCE_BETWEEN_CIRCLES = 10;//40;
+int MAX_DISTANCE_BETWEEN_CIRCLES = 55;
+int MIN_DISTANCE_BETWEEN_CIRCLES = 40;
 int MINAREA = 2000;
 int MAXAREA = 15000;
 int ERODE = 30;
@@ -62,7 +63,8 @@ int ballDist = 20;
 double ballRadius = 7.5/2;
 //The Field Of View of the camera used at the moment
 //Microsoft webcam
-int FOV = 66; //48;
+int FOV_H = 123;//48;//66; //48;
+int FOV_V = 94;
 
 string windowTitle = "frame";
 
@@ -114,22 +116,6 @@ void createTrackbars(int number, char* min1, char* max1, char* min2, char* max2,
     cv::namedWindow(trackbarWindowName, 0);
     //create memory to store trackbar name on window
     char TrackbarName[50];
-    /*
-    sprintf_s(TrackbarName, min1, minInt1);
-    sprintf_s(TrackbarName, max1, maxInt1);
-    sprintf_s(TrackbarName, min2, minInt2);
-    sprintf_s(TrackbarName, max2, maxInt2);
-    sprintf_s(TrackbarName, min3, minInt3);
-    sprintf_s(TrackbarName, max3, maxInt3);
-    sprintf_s(TrackbarName, "MINAREA", MINAREA);
-    sprintf_s(TrackbarName, "MAXAREA", MAXAREA);
-    sprintf_s(TrackbarName, "ERODE", ERODE);
-    sprintf_s(TrackbarName, "DILATE", DILATE);
-    sprintf_s(TrackbarName, "CIRCLE_PARAM_1", cP1);
-    sprintf_s(TrackbarName, "CIRCLE_PARAM_2", cP2);
-    sprintf_s(TrackbarName, "CIRCLE_RADIUS", maxHoughRadius);
-    sprintf_s(TrackbarName, "FOV", 100);
-    */
     //create trackbars and insert them into window
     //3 parameters are: the address of the variable that is changing when the trackbar is moved(eg.H_LOW),
     //the max value the trackbar can move (eg. H_HIGH), 
@@ -148,8 +134,7 @@ void createTrackbars(int number, char* min1, char* max1, char* min2, char* max2,
     createTrackbar("CIRCLE_PARAM_1", trackbarWindowName, &cP1, 500, on_trackbar);
     createTrackbar("CIRCLE_PARAM_2", trackbarWindowName, &cP2, 100, on_trackbar);
     createTrackbar("CIRCLE_RADIUS", trackbarWindowName, &maxHoughRadius, 250, on_trackbar);
-    createTrackbar("FOV", trackbarWindowName, &FOV, 100, on_trackbar);
-    createTrackbar("Darken", trackbarWindowName, &darkenFactor, 10, on_trackbar);
+    createTrackbar("FOV_H", trackbarWindowName, &FOV_H, 140, on_trackbar);
 }
 
 void morphOps(Mat &thresh){
@@ -451,12 +436,12 @@ void trackCircles(Mat &frame, Mat& gray, vector<Object> &tackedCircles, bool con
 }
 
 /**Calculate the 3D position for all objects in the given list */
-void calculate3DPosition(vector<Object> &objects, Mat &frame, double ballRadius, int FOV)
+void calculate3DPosition(vector<Object> &objects, Mat &frame, double ballRadius, int FOV_H, int FOV_V)
 {
 	for(int i=0; i<objects.size(); i++){
         objects.at(i).setXDist( (ballRadius / objects.at(i).getRadius()) * (objects.at(i).getXPos() - frame.cols/2) );
         objects.at(i).setYDist( (ballRadius / objects.at(i).getRadius()) * (objects.at(i).getYPos() - frame.rows/2) );
-        objects.at(i).setZDist( ballRadius * frame.cols / (2*objects.at(i).getRadius()*tan(FOV * PI/360)) );
+        objects.at(i).setZDist( ballRadius * frame.cols / (2*objects.at(i).getRadius()*tan(FOV_H * PI/360) ) );
     }
 }
 
@@ -655,18 +640,18 @@ void calculatePlane(vector<Object> &objects, vector<double> &midPos, vector<doub
     }
 }
 
-void matchLast(vector<Object> &last, vector<Object> &dst)
+void matchLast(vector<Object> &last, vector<Object> &dst, int index)
 {
     for(int i = 0; i < dst.size(); ++i)
     {
         for(int j = 0; j < last.size(); ++j)
         {
             //Check if the radius and position of the circles and the filtered objects match
-            if(dst.at(i).getXPos() - dst.at(i).getRadius() <= last.at(j).getXPos() && last.at(j).getXPos() <= dst.at(i).getXPos() + dst.at(i).getRadius() &&
-                dst.at(i).getYPos() - dst.at(i).getRadius() <= last.at(j).getYPos() && last.at(j).getYPos() <= dst.at(i).getYPos() + dst.at(i).getRadius() &&
-                checkRadiusRatio(dst.at(i), last.at(j), 2))
+            if(dst.at(i).getXPos() - dst.at(i).getRadius()*(5 - index)/2 <= last.at(j).getXPos() && last.at(j).getXPos() <= dst.at(i).getXPos() + dst.at(i).getRadius()*(5 - index)/2 &&
+                dst.at(i).getYPos() - dst.at(i).getRadius()*(5 - index)/2 <= last.at(j).getYPos() && last.at(j).getYPos() <= dst.at(i).getYPos() + dst.at(i).getRadius()*(5 - index)/2 &&
+                checkRadiusRatio(dst.at(i), last.at(j), (2.5 - 0.25*index)))
             {
-                dst.at(i).incPrio(30);
+                dst.at(i).incPrio(4*(index + 1));
             }
         }
     }
@@ -741,6 +726,9 @@ void trackObjects(Mat &frame, Mat &threashold, vector<Object> &foundObjects, int
 	
 	// Convert from frame (RGB) to YCrCb
     cvtColor(frame, target, code);
+
+	//Gaussian the filtered image
+	GaussianBlur(target, target, Size(9, 9), 0, 0);
 	
 	// Convert traget to binary B&W
 	inRange(target, scalarMin, scalarMax, threashold);
@@ -829,7 +817,7 @@ int main(int argc, char** argv)
     }
 
     //Colored frames
-    Mat frameColor, frameGray, threasholdYCrCb, threasholdHSV, frameColorDark, frameGrayThresholdYCrCb, frameGrayThresholdHSV;
+    Mat frameColor, frameGray, threasholdYCrCb, threasholdHSV, frameColorDark, frameGrayThresholdYCrCb, frameGrayThresholdHSV, frameColorUntouched;
 
 
 	vector<Object> trackedYCrCb;
@@ -839,7 +827,7 @@ int main(int argc, char** argv)
 	vector<Object> trackedCirclesHSV;
 	vector<Object> both;
 	vector<Object> bothTemp;
-    vector<Object> lastPrio;
+    list< vector<Object> > lastPrios;
     vector< vector<int> > neighborhood;
     vector<double> angleBuff;
     vector<double> distanceBuff;
@@ -860,16 +848,16 @@ int main(int argc, char** argv)
         YCbCr färger och HSV färger*/
 
     //For YCbCr filtering
-    Y_MIN = 0;
+    Y_MIN = 0; 
     Y_MAX = 256;
-    Cr_MIN = 0;
-    Cr_MAX = 2556;
-    Cb_MIN = 146;
-    Cb_MAX = 256;
+    Cr_MIN = 109;
+    Cr_MAX = 165;
+    Cb_MIN = 156;
+    Cb_MAX = 242;
     //For HSV filtering
-    H_MIN = 109;
-    H_MAX = 256;
-    S_MIN = 89;
+    H_MIN = 112;
+    H_MAX = 133;
+    S_MIN = 88;
     S_MAX = 256;
     V_MIN = 0;
     V_MAX = 256;
@@ -878,7 +866,7 @@ int main(int argc, char** argv)
     MAXAREA = 30000;
     cP1 = 90;
     cP2 = 12;
-    maxHoughRadius = 80;
+    maxHoughRadius = 30;
     ERODE = 1;
     DILATE = 1; 
     
@@ -912,8 +900,8 @@ int main(int argc, char** argv)
             cv::namedWindow(windowHSV, CV_WINDOW_AUTOSIZE );
             cv::namedWindow(windowGray, CV_WINDOW_AUTOSIZE );
             
-            cv::namedWindow(windowYCrCb2, CV_WINDOW_AUTOSIZE );
-            cv::namedWindow(windowHSV2, CV_WINDOW_AUTOSIZE );
+            //cv::namedWindow(windowYCrCb2, CV_WINDOW_AUTOSIZE );
+            //cv::namedWindow(windowHSV2, CV_WINDOW_AUTOSIZE );
         }
         
         //Create window
@@ -972,6 +960,7 @@ int main(int argc, char** argv)
         
         //read the frame from the camera
         cam.read(frameColor);
+        frameColor.copyTo(frameColorUntouched);
 
         // FPS viewer
         if (dflag >= 1) {
@@ -988,7 +977,7 @@ int main(int argc, char** argv)
 
         if (!frameColor.empty()){
             // Blur the image a bit
-            GaussianBlur(frameColor, frameColor, Size(3, 3), 0, 0);
+            GaussianBlur(frameColor, frameColor, Size(1, 1), 0, 0);
 
             //Darken image
             /*
@@ -1044,13 +1033,16 @@ int main(int argc, char** argv)
 				matchObjects(bothTemp, trackedCircles, both, true);
 
                 //If there is three objects from the previous loop
-                if(lastPrio.size() == 3)
-                {
-                    matchLast(lastPrio, both);
+                int i = 0;
+                list< vector<Object> >::iterator iterator;
+                for (iterator = lastPrios.begin(); iterator != lastPrios.end(); iterator++){
+              //  for (list<vector<Object>>::iterator iter = lastPrios.begin() ; iter != lastPrios.end(); iter++){
+                    matchLast(*iterator, both, i);
+                    i++;
                 }
 				
 				//Set the distance for X, Y and Z for all the objects in the both vector
-				calculate3DPosition(both, frameColor, ballRadius, FOV);
+				calculate3DPosition(both, frameColor, ballRadius, FOV_H, FOV_V);
 				
 				//Create pairs by their distance
 				createPairsByDistance(both, neighborhood, frameColor);
@@ -1062,14 +1054,19 @@ int main(int argc, char** argv)
 				std::sort(both.begin(), both.end(), sorting);
 
                 //Move the three highest prioritized circles into the buffer, making use of them in the next loop
-                lastPrio.clear();
+                if(lastPrios.size() >= 5)
+                {
+                    lastPrios.pop_back();
+                }
+
                 if(both.size() >= 3)
                 {
+                    vector<Object> lastPrio;
                     copyObject(both.at(0), lastPrio);
                     copyObject(both.at(1), lastPrio);
                     copyObject(both.at(2), lastPrio);
+                    lastPrios.push_front(lastPrio);
                 }
-
                 
                 if(both.size() >= 3 && dflag >= 3)
                 {
@@ -1098,7 +1095,7 @@ int main(int argc, char** argv)
                 }
                 
 
-                calculatePlane(both, midPos, angles, frameColor, ballRadius, FOV, dflag);
+                calculatePlane(both, midPos, angles, frameColor, ballRadius, FOV_H, dflag);
 
                 //HERE WE HAVE OUR AWESOME VALUES. THEY LAY IN midPos AND angles!! OMG ERMAHGERD!
 
@@ -1141,14 +1138,26 @@ int main(int argc, char** argv)
                     //FPS
                     putText(frameColor,"FPS: "+std::to_string(fps),Point(30,180), 1, 1.2, cv::Scalar(0, 255, 255), 1);
 
+                    if(!vflag.empty())
+                    {
+                        //Text if we are recording video or not
+                        putText(frameColor,"Recording: "+ std::to_string(writeVideo),Point(30,210), 1, 1.2, cv::Scalar(0, 255, 255), 1);
+                    }
+
                 }
 				
 				//If in debug mode, print the prio to the screen
 				if(dflag >= 2)
 				{
-                    for(int i = 0; i<lastPrio.size(); ++i)
-                    {
-                        circle(frameColor, Point(lastPrio.at(i).getXPos(), lastPrio.at(i).getYPos()), lastPrio.at(i).getRadius(), Scalar(150, 0, 0), 3);
+                    int j = 0;
+                    list< vector<Object> >::iterator iterator;
+                    for (iterator = lastPrios.begin(); iterator != lastPrios.end(); iterator++){
+                   // for (list<vector<Object>>::iterator iter = lastPrios.begin() ; iter != lastPrios.end(); iter++){
+                        for(int i = 0; i<3; ++i)
+                        {
+                            circle(frameColor, Point(iterator->at(i).getXPos(), iterator->at(i).getYPos()), iterator->at(i).getRadius(), Scalar(150, 0, 0, 42*(j+1)), 3);
+                        }
+                        j++;
                     }
                     for(int i = 0; i<trackedCircles.size(); ++i)
                     {
@@ -1211,7 +1220,7 @@ int main(int argc, char** argv)
             catch (cv::Exception & e)
             {
                 cout << e.what() << endl;
-                return 1;
+                //return 1;
             }
         }
         char k = waitKey(1);
@@ -1222,6 +1231,10 @@ int main(int argc, char** argv)
             outputHSV.release();
             outputYCrCb.release();
             outputGray.release();
+        }
+        if (k == 'c' || k == 'C')
+        {
+            lastPrios.clear();
         }
         if (dflag>=1 && (k=='f' || k=='F')) printFPS=!printFPS;
         if (dflag>=1 && !vflag.empty() && (k=='v' || k=='V')) writeVideo=!writeVideo;
