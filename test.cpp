@@ -438,7 +438,7 @@ void trackCircles(Mat &frame, Mat& gray, vector<Object> &tackedCircles, bool con
 /**Calculate the 3D position for all objects in the given list */
 void calculate3DPosition(vector<Object> &objects, Mat &frame, double ballRadius, int FOV_H, int FOV_V)
 {
-	for(int i=0; i<objects.size(); i++){
+    for(int i=0; i<objects.size(); i++){
         objects.at(i).setXDist( (ballRadius / objects.at(i).getRadius()) * (objects.at(i).getXPos() - frame.cols/2) );
         objects.at(i).setYDist( (ballRadius / objects.at(i).getRadius()) * (objects.at(i).getYPos() - frame.rows/2) );
         objects.at(i).setZDist( ballRadius * frame.cols / (2*objects.at(i).getRadius()*tan(FOV_H * PI/360) ) );
@@ -581,8 +581,8 @@ void calculatePlane(vector<Object> &objects, vector<double> &midPos, vector<doub
 
         //Calculate and create the angle vector
         angles.push_back((180/PI) * atan(normal.at(0)/normal.at(2)));
-		angles.push_back((180/PI) * atan(normal.at(1)/normal.at(2)));
-		angles.push_back((180/PI) * atan(normal.at(0)/normal.at(1)));
+        angles.push_back((180/PI) * atan(normal.at(1)/normal.at(2)));
+        angles.push_back((180/PI) * atan(normal.at(0)/normal.at(1)));
 
         if(dFlag >=2)
         {
@@ -677,71 +677,71 @@ void copyObject(Object &src, vector<Object> &dst)
 void trackHSVObjects(Mat &frame, Mat &threashold, vector<Object> &foundObjects)
 {
     Mat target;
-	//Black and white frames
+    //Black and white frames
     Mat frameThreshold;
     threashold.copyTo(frameThreshold);
-	
-	// Convert from frame (RGB) to HSV
+    
+    // Convert from frame (RGB) to HSV
     cvtColor(frame, target, COLOR_RGB2HSV);
-	
-	// Convert traget to binary B&W
-	inRange(target, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX), frameThreshold);
-	
-	//Gaussian the black/white image
-	GaussianBlur(frameThreshold, frameThreshold, Size(3, 3), 0, 0);
-	
-	//morphops the black/white image
-	morphOps(frameThreshold);
-	
-	findObjects(frameThreshold, foundObjects);
+    
+    // Convert traget to binary B&W
+    inRange(target, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX), frameThreshold);
+    
+    //Gaussian the black/white image
+    GaussianBlur(frameThreshold, frameThreshold, Size(3, 3), 0, 0);
+    
+    //morphops the black/white image
+    morphOps(frameThreshold);
+    
+    findObjects(frameThreshold, foundObjects);
 }
 
 void trackYCrCbObjects(Mat &frame, Mat &threashold, vector<Object> &foundObjects)
 {
     Mat target;
-	//Black and white frames
+    //Black and white frames
     Mat frameThreshold;
     threashold.copyTo(frameThreshold);
-	
-	// Convert from frame (RGB) to YCrCb
+    
+    // Convert from frame (RGB) to YCrCb
     cvtColor(frame, target, COLOR_RGB2YCrCb);
-	
-	// Convert traget to binary B&W
-	inRange(target, Scalar(Y_MIN, Cr_MIN, Cb_MIN), Scalar(Y_MAX, Cr_MAX, Cb_MAX), frameThreshold);
-	
-	//Gaussian the black/white image
-	GaussianBlur(frameThreshold, frameThreshold, Size(3, 3), 0, 0);
-	
-	//morphops the black/white image
-	morphOps(frameThreshold);
-	
-	findObjects(frameThreshold, foundObjects);
+    
+    // Convert traget to binary B&W
+    inRange(target, Scalar(Y_MIN, Cr_MIN, Cb_MIN), Scalar(Y_MAX, Cr_MAX, Cb_MAX), frameThreshold);
+    
+    //Gaussian the black/white image
+    GaussianBlur(frameThreshold, frameThreshold, Size(3, 3), 0, 0);
+    
+    //morphops the black/white image
+    morphOps(frameThreshold);
+    
+    findObjects(frameThreshold, foundObjects);
 }
 
 void trackObjects(Mat &frame, Mat &threashold, vector<Object> &foundObjects, int code, Scalar scalarMin, Scalar scalarMax)
 {
     Mat target;
-	//Black and white frames
+    //Black and white frames
     Mat frameThreshold;
-	
-	// Convert from frame (RGB) to YCrCb
+    
+    // Convert from frame (RGB) to YCrCb
     cvtColor(frame, target, code);
 
-	//Gaussian the filtered image
-	GaussianBlur(target, target, Size(9, 9), 0, 0);
-	
-	// Convert traget to binary B&W
-	inRange(target, scalarMin, scalarMax, threashold);
-	
-	//Gaussian the black/white image
-	GaussianBlur(threashold, threashold, Size(3, 3), 0, 0);
-	
-	//morphops the black/white image
-	morphOps(threashold);
+    //Gaussian the filtered image
+    GaussianBlur(target, target, Size(9, 9), 0, 0);
+    
+    // Convert traget to binary B&W
+    inRange(target, scalarMin, scalarMax, threashold);
+    
+    //Gaussian the black/white image
+    GaussianBlur(threashold, threashold, Size(3, 3), 0, 0);
+    
+    //morphops the black/white image
+    morphOps(threashold);
 
     threashold.copyTo(frameThreshold);
-	
-	findObjects(frameThreshold, foundObjects);
+    
+    findObjects(frameThreshold, foundObjects);
 }
 
 void darkenMatrix(Mat &frame)
@@ -820,13 +820,13 @@ int main(int argc, char** argv)
     Mat frameColor, frameGray, threasholdYCrCb, threasholdHSV, frameColorDark, frameGrayThresholdYCrCb, frameGrayThresholdHSV, frameColorUntouched;
 
 
-	vector<Object> trackedYCrCb;
+    vector<Object> trackedYCrCb;
     vector<Object> trackedHSV;
-	vector<Object> trackedCircles;
-	vector<Object> trackedCirclesYCrCb;
-	vector<Object> trackedCirclesHSV;
-	vector<Object> both;
-	vector<Object> bothTemp;
+    vector<Object> trackedCircles;
+    vector<Object> trackedCirclesYCrCb;
+    vector<Object> trackedCirclesHSV;
+    vector<Object> both;
+    vector<Object> bothTemp;
     list< vector<Object> > lastPrios;
     vector< vector<int> > neighborhood;
     vector<double> angleBuff;
@@ -910,37 +910,37 @@ int main(int argc, char** argv)
         // Start timer for fps counting
         startTime = getMilliCount();
     }
-	
-	//creat output for video saving
-	cv::VideoWriter outputColor, outputHSV, outputYCrCb, outputGray;
+    
+    //creat output for video saving
+    cv::VideoWriter outputColor, outputHSV, outputYCrCb, outputGray;
     if(!vflag.empty()){
         if(dflag >= 1 && rflag <= 0)
         {
             cout << "Videoflag set! filename: " << vflag << "\n";
         }
 
-		outputColor.open ( vflag + "Color.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), true );
-		outputHSV.open ( vflag + "HSV.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), false );
-		outputYCrCb.open ( vflag + "YCrCb.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), false );
-		outputGray.open ( vflag + "Gray.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), false );
+        outputColor.open ( vflag + "Color.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), true );
+        outputHSV.open ( vflag + "HSV.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), false );
+        outputYCrCb.open ( vflag + "YCrCb.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), false );
+        outputGray.open ( vflag + "Gray.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), false );
 
-		if (!outputColor.isOpened() && dflag >= 1 && rflag <= 0)
-		{
-			cout << "Output frameColor could not be opened\n";
-		}
+        if (!outputColor.isOpened() && dflag >= 1 && rflag <= 0)
+        {
+            cout << "Output frameColor could not be opened\n";
+        }
         if (!outputHSV.isOpened() && dflag >= 1 && rflag <= 0)
-		{
-			cout << "Output thresholdHSV could not be opened\n";
-		}
+        {
+            cout << "Output thresholdHSV could not be opened\n";
+        }
         if (!outputYCrCb.isOpened() && dflag >= 1 && rflag <= 0)
-		{
-			cout << "Output thresholdYCrCb could not be opened\n";
-		}
+        {
+            cout << "Output thresholdYCrCb could not be opened\n";
+        }
         if (!outputGray.isOpened() && dflag >= 1 && rflag <= 0)
-		{
-			cout << "Output gray could not be opened\n";
-		}
-	}
+        {
+            cout << "Output gray could not be opened\n";
+        }
+    }
 
     vector<Mat> channels;
 
@@ -1021,16 +1021,16 @@ int main(int argc, char** argv)
                 //HSVThread.join();
                 //CircleThread.join();
                 
-				//Match the filtered circles from YCrCb and HSV with eachother and set the prio
-				//matchObjects(trackedYCrCb, trackedHSV, bothTemp, false);
-				//matchObjects(bothTemp, trackedCircles, both, true);
+                //Match the filtered circles from YCrCb and HSV with eachother and set the prio
+                //matchObjects(trackedYCrCb, trackedHSV, bothTemp, false);
+                //matchObjects(bothTemp, trackedCircles, both, true);
 
                 
                 //matchObjects(trackedYCrCb, trackedCirclesYCrCb, tempVector, false);
                 //matchObjects(trackedHSV, trackedCirclesHSV, tempVector, false);
                 
                 matchObjects(trackedYCrCb, trackedHSV, bothTemp, false);
-				matchObjects(bothTemp, trackedCircles, both, true);
+                matchObjects(bothTemp, trackedCircles, both, true);
 
                 //If there is three objects from the previous loop
                 int i = 0;
@@ -1040,18 +1040,18 @@ int main(int argc, char** argv)
                     matchLast(*iterator, both, i);
                     i++;
                 }
-				
-				//Set the distance for X, Y and Z for all the objects in the both vector
-				calculate3DPosition(both, frameColor, ballRadius, FOV_H, FOV_V);
-				
-				//Create pairs by their distance
-				createPairsByDistance(both, neighborhood, frameColor);
-				
-				//Match the pairs into triangles
-				matchTriangles(both, neighborhood);
-				
-				//Sort the "both" vector with the highest prio first
-				std::sort(both.begin(), both.end(), sorting);
+                
+                //Set the distance for X, Y and Z for all the objects in the both vector
+                calculate3DPosition(both, frameColor, ballRadius, FOV_H, FOV_V);
+                
+                //Create pairs by their distance
+                createPairsByDistance(both, neighborhood, frameColor);
+                
+                //Match the pairs into triangles
+                matchTriangles(both, neighborhood);
+                
+                //Sort the "both" vector with the highest prio first
+                std::sort(both.begin(), both.end(), sorting);
 
                 //Move the three highest prioritized circles into the buffer, making use of them in the next loop
                 if(lastPrios.size() >= 5)
@@ -1121,10 +1121,10 @@ int main(int argc, char** argv)
                         distanceBuff.clear();
                     }
 
-					if(midPos.size() == 3 && angles.size() == 3)
+                    if(midPos.size() == 3 && angles.size() == 3)
                     {
-						angleBuff.push_back(angles.at(1));
-						distanceBuff.push_back(midPos.at(2));
+                        angleBuff.push_back(angles.at(1));
+                        distanceBuff.push_back(midPos.at(2));
 
                         putText(frameColor, "Distance X: " + std::to_string((int)midPos.at(0)) + " cm", cv::Point(30, 30), 1, 1.6, cv::Scalar(0, 255, 255), 2);
                         putText(frameColor, "Distance Y: " + std::to_string((int)midPos.at(1)) + " cm", cv::Point(30, 55), 1, 1.6, cv::Scalar(0, 255, 255), 2);
@@ -1145,10 +1145,10 @@ int main(int argc, char** argv)
                     }
 
                 }
-				
-				//If in debug mode, print the prio to the screen
-				if(dflag >= 2)
-				{
+                
+                //If in debug mode, print the prio to the screen
+                if(dflag >= 2)
+                {
                     int j = 0;
                     list< vector<Object> >::iterator iterator;
                     for (iterator = lastPrios.begin(); iterator != lastPrios.end(); iterator++){
@@ -1172,7 +1172,7 @@ int main(int argc, char** argv)
                         circle(frameColor, Point(trackedYCrCb.at(i).getXPos(), trackedYCrCb.at(i).getYPos()), trackedYCrCb.at(i).getRadius(), Scalar(0,255,255));
                     }
                     printPrio(both, frameColor);
-				}
+                }
                 
                 
                 
@@ -1210,12 +1210,12 @@ int main(int argc, char** argv)
                 }
 
                 if(!vflag.empty() && writeVideo)
-				{
+                {
                     outputColor.write(frameColor);
                     outputHSV.write(threasholdHSV);
                     outputYCrCb.write(threasholdYCrCb);
                     outputGray.write(frameGray);
-				}
+                }
             }
             catch (cv::Exception & e)
             {
