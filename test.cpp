@@ -24,6 +24,8 @@
 #include "tclap/CmdLine.h"
 #include <sys/timeb.h>
 
+#include "../cam-share/Read.cpp"
+
 
 using namespace TCLAP;
 using namespace cv;
@@ -51,7 +53,7 @@ int S_MIN = 0;
 int S_MAX = 256;
 int V_MIN = 0;
 int V_MAX = 256;
-int cP1 = 400; 
+int cP1 = 400;
 int cP2 = 30; //cerist papper
 int maxHoughRadius = 80;
 int darkenFactor = 1;
@@ -118,9 +120,9 @@ void createTrackbars(int number, char* min1, char* max1, char* min2, char* max2,
     char TrackbarName[50];
     //create trackbars and insert them into window
     //3 parameters are: the address of the variable that is changing when the trackbar is moved(eg.H_LOW),
-    //the max value the trackbar can move (eg. H_HIGH), 
+    //the max value the trackbar can move (eg. H_HIGH),
     //and the function that is called whenever the trackbar is moved(eg. on_trackbar)
-    //                                  ---->    ---->     ---->      
+    //                                  ---->    ---->     ---->
     createTrackbar(min1, trackbarWindowName, minInt1, 256, on_trackbar);
     createTrackbar(max1, trackbarWindowName, maxInt1, 256, on_trackbar);
     createTrackbar(min2, trackbarWindowName, minInt2, 256, on_trackbar);
@@ -185,7 +187,7 @@ void drawObject(vector<Object> objects, Mat &frame){
         cv::line(frame, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), cv::Point(objects.at(j).getXPos(), objects.at(j).getYPos()),cv::Scalar(0, 0, 255));
     }
     for (int i = 0; i < objects.size(); i++){
-        
+
         cv::circle(frame, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), objects.at(i).getRadius(), cv::Scalar(0, 0, 255));
     }
 }
@@ -206,7 +208,7 @@ void findObjects(Mat &frame, vector<Object> &objects){
     Moments mom;
     vector<Vec4i> hierarchy;
     vector< vector<Point> > contours;
-    
+
     findContours(frame, contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE);
 
     //Check if any filtered objects was found
@@ -289,8 +291,8 @@ void matchObjects(vector<Object> &first, vector<Object> &second, vector<Object> 
                     first.at(i).setYPos(newYPos);
                     second.at(j).setYPos(newYPos);
                 }
-                
-                
+
+
             }
         }
         result.push_back(first.at(i));
@@ -412,7 +414,7 @@ void matchTriangles(vector<Object> &objects, vector< vector<int> > &neighborhood
                 }
             }
         }
-        
+
     }
 }
 
@@ -424,7 +426,7 @@ void trackCircles(Mat &frame, Mat& gray, vector<Object> &tackedCircles, bool con
     {
         cvtColor(frame, gray, CV_BGR2GRAY);
     }
-    
+
     //Gaussian the grey image
     //GaussianBlur(gray, gray, Size(3, 3), 0, 0);
     //A temporary list in which the detected circles will be until they are converted into a list of Object
@@ -445,7 +447,7 @@ void calculate3DPosition(vector<Object> &objects, Mat &frame, double ballRadius,
     }
 }
 
-/** Calculates the normal and mid vector. If dFlag is >= 2, then it prints aswell. 
+/** Calculates the normal and mid vector. If dFlag is >= 2, then it prints aswell.
     The given Object list must be sorted! */
 void calculatePlane(vector<Object> &objects, vector<double> &midPos, vector<double> &angles, Mat &frame, double ballRadius, int FOV, int dFlag)
 {
@@ -455,7 +457,7 @@ void calculatePlane(vector<Object> &objects, vector<double> &midPos, vector<doub
         vector<double> vect2;
         vector<double> normal;
         double lineLength = 10;
-        
+
         //Calculate the first vector between the first and second object
         vect1.push_back(objects.at(1).getXDist() - objects.at(0).getXDist());
         vect1.push_back(objects.at(1).getYDist() - objects.at(0).getYDist());
@@ -477,7 +479,7 @@ void calculatePlane(vector<Object> &objects, vector<double> &midPos, vector<doub
                 //Scale
                 3);
         }
-        
+
         //Set the initial values for the mid position
         midPos.push_back(objects.at(0).getXDist() + vect1.at(0)/3);
         midPos.push_back(objects.at(0).getYDist() + vect1.at(1)/3);
@@ -488,15 +490,15 @@ void calculatePlane(vector<Object> &objects, vector<double> &midPos, vector<doub
             putText(frame, "vect1 Z: " + std::to_string(vect1.at(2)) + " cm",Point(50,220), 1, 1.2, cv::Scalar(0, 255, 255), 1);
         }
 
-        
 
-        
+
+
         //Calculate the second vector between the first and third object
         vect2.push_back(objects.at(2).getXDist() - objects.at(0).getXDist());
         vect2.push_back(objects.at(2).getYDist() - objects.at(0).getYDist());
         vect2.push_back(objects.at(2).getZDist() - objects.at(0).getZDist());
 
-        
+
         if(dFlag >= 3)
         {
             cv::line(
@@ -529,8 +531,8 @@ void calculatePlane(vector<Object> &objects, vector<double> &midPos, vector<doub
         {
             circle(frame, Point(frame.cols/2 + dist2Pix(midPos.at(0), objects.at(0).getRadius(), ballRadius), frame.rows/2 + dist2Pix(midPos.at(1), objects.at(0).getRadius(), ballRadius)), 3, cv::Scalar(0, 255, 255), 3);
         }
-        
-        
+
+
 
         //Calculates the normal vector using the first and second vector (see http://en.wikipedia.org/wiki/Cross_product for calculations)
         double norX = vect1.at(1)*vect2.at(2) - vect1.at(2)*vect2.at(1);
@@ -636,7 +638,7 @@ void calculatePlane(vector<Object> &objects, vector<double> &midPos, vector<doub
                 //Scale
                 3);
         }
-        
+
     }
 }
 
@@ -680,19 +682,19 @@ void trackHSVObjects(Mat &frame, Mat &threashold, vector<Object> &foundObjects)
     //Black and white frames
     Mat frameThreshold;
     threashold.copyTo(frameThreshold);
-    
+
     // Convert from frame (RGB) to HSV
     cvtColor(frame, target, COLOR_RGB2HSV);
-    
+
     // Convert traget to binary B&W
     inRange(target, Scalar(H_MIN, S_MIN, V_MIN), Scalar(H_MAX, S_MAX, V_MAX), frameThreshold);
-    
+
     //Gaussian the black/white image
     GaussianBlur(frameThreshold, frameThreshold, Size(3, 3), 0, 0);
-    
+
     //morphops the black/white image
     morphOps(frameThreshold);
-    
+
     findObjects(frameThreshold, foundObjects);
 }
 
@@ -702,19 +704,19 @@ void trackYCrCbObjects(Mat &frame, Mat &threashold, vector<Object> &foundObjects
     //Black and white frames
     Mat frameThreshold;
     threashold.copyTo(frameThreshold);
-    
+
     // Convert from frame (RGB) to YCrCb
     cvtColor(frame, target, COLOR_RGB2YCrCb);
-    
+
     // Convert traget to binary B&W
     inRange(target, Scalar(Y_MIN, Cr_MIN, Cb_MIN), Scalar(Y_MAX, Cr_MAX, Cb_MAX), frameThreshold);
-    
+
     //Gaussian the black/white image
     GaussianBlur(frameThreshold, frameThreshold, Size(3, 3), 0, 0);
-    
+
     //morphops the black/white image
     morphOps(frameThreshold);
-    
+
     findObjects(frameThreshold, foundObjects);
 }
 
@@ -723,24 +725,24 @@ void trackObjects(Mat &frame, Mat &threashold, vector<Object> &foundObjects, int
     Mat target;
     //Black and white frames
     Mat frameThreshold;
-    
+
     // Convert from frame (RGB) to YCrCb
     cvtColor(frame, target, code);
 
     //Gaussian the filtered image
     GaussianBlur(target, target, Size(9, 9), 0, 0);
-    
+
     // Convert traget to binary B&W
     inRange(target, scalarMin, scalarMax, threashold);
-    
+
     //Gaussian the black/white image
     GaussianBlur(threashold, threashold, Size(3, 3), 0, 0);
-    
+
     //morphops the black/white image
     morphOps(threashold);
 
     threashold.copyTo(frameThreshold);
-    
+
     findObjects(frameThreshold, foundObjects);
 }
 
@@ -776,7 +778,7 @@ int main(int argc, char** argv)
         cmd.add( distance );
         // Parse arguments
         cmd.parse( argc, argv );
-    
+
         // Do what you intend too...
         dflag = debug.getValue();
         vflag = video.getValue();
@@ -788,13 +790,14 @@ int main(int argc, char** argv)
     {
         cout << "ERROR: " << e.error() << " " << e.argId() << endl;
         return 1;
-    }  
+    }
 
     if(dflag >= 1 && rflag <= 0)
     {
         cout << "Camera set is: "<< cflag << endl;
     }
-    VideoCapture cam(cflag);
+    Read *pRead = new Read("../cam-share/caminfo.log");
+    cv::Size camSize(pRead->getWidth(), pRead->getHeight());
 
     //Varibles for FPS counting
     int startTime;
@@ -803,18 +806,6 @@ int main(int argc, char** argv)
     bool printFPS = false;
     bool writeVideo = true;
     bool loop = true;
-
-
-    if (!cam.isOpened()) {
-        cout << "Error loading camera";
-        return 1;
-    }
-    else {
-        if(dflag >= 1 && rflag <= 0)
-        {
-            cout << "Camera loaded OK\n\n";
-        }
-    }
 
     //Colored frames
     Mat frameColor, frameGray, threasholdYCrCb, threasholdHSV, frameColorDark, frameGrayThresholdYCrCb, frameGrayThresholdHSV, frameColorUntouched;
@@ -848,7 +839,7 @@ int main(int argc, char** argv)
         YCbCr färger och HSV färger*/
 
     //For YCbCr filtering
-    Y_MIN = 0; 
+    Y_MIN = 0;
     Y_MAX = 256;
     Cr_MIN = 109;
     Cr_MAX = 165;
@@ -868,8 +859,8 @@ int main(int argc, char** argv)
     cP2 = 12;
     maxHoughRadius = 30;
     ERODE = 1;
-    DILATE = 1; 
-    
+    DILATE = 1;
+
     string windowYCrCb = "YCrCb image";
     string windowHSV = "HSV image";
     string windowGray = "Gray image";
@@ -894,23 +885,23 @@ int main(int argc, char** argv)
             {
                 cout << "Starting to capture!\nBall radius set to: " << ballRadius << "\n";
             }
-            
-            
+
+
             cv::namedWindow(windowYCrCb, CV_WINDOW_AUTOSIZE );
             cv::namedWindow(windowHSV, CV_WINDOW_AUTOSIZE );
             cv::namedWindow(windowGray, CV_WINDOW_AUTOSIZE );
-            
+
             //cv::namedWindow(windowYCrCb2, CV_WINDOW_AUTOSIZE );
             //cv::namedWindow(windowHSV2, CV_WINDOW_AUTOSIZE );
         }
-        
+
         //Create window
         cv::namedWindow(windowTitle, CV_WINDOW_FREERATIO );
 
         // Start timer for fps counting
         startTime = getMilliCount();
     }
-    
+
     //creat output for video saving
     cv::VideoWriter outputColor, outputHSV, outputYCrCb, outputGray;
     if(!vflag.empty()){
@@ -919,10 +910,10 @@ int main(int argc, char** argv)
             cout << "Videoflag set! filename: " << vflag << "\n";
         }
 
-        outputColor.open ( vflag + "Color.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), true );
-        outputHSV.open ( vflag + "HSV.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), false );
-        outputYCrCb.open ( vflag + "YCrCb.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), false );
-        outputGray.open ( vflag + "Gray.avi", CV_FOURCC('D','I','V','X'), 15, cv::Size (cam.get(CV_CAP_PROP_FRAME_WIDTH),cam.get(CV_CAP_PROP_FRAME_HEIGHT)), false );
+        outputColor.open ( vflag + "Color.avi", CV_FOURCC('D','I','V','X'), 15, camSize, true );
+        outputHSV.open ( vflag + "HSV.avi", CV_FOURCC('D','I','V','X'), 15, camSize, false );
+        outputYCrCb.open ( vflag + "YCrCb.avi", CV_FOURCC('D','I','V','X'), 15, camSize, false );
+        outputGray.open ( vflag + "Gray.avi", CV_FOURCC('D','I','V','X'), 15, camSize, false );
 
         if (!outputColor.isOpened() && dflag >= 1 && rflag <= 0)
         {
@@ -945,7 +936,7 @@ int main(int argc, char** argv)
     vector<Mat> channels;
 
     while (loop) {
-        
+
         //Clear from old loop
         both.clear();
         bothTemp.clear();
@@ -957,9 +948,10 @@ int main(int argc, char** argv)
         angles.clear();
 
         //tempVector.clear();
-        
-        //read the frame from the camera
-        cam.read(frameColor);
+
+        //read the frame from the shared camera memory
+        pRead->frame.copyTo(frameColor);
+
         frameColor.copyTo(frameColorUntouched);
 
         // FPS viewer
@@ -986,21 +978,21 @@ int main(int argc, char** argv)
                for(int x=0; x<frameColorDark.cols; x++)
                  for(int c=0;c<3;c++)
                     frameColorDark.at<Vec3f>(y,x)[c] = (darkenFactor/10.0)*pow(frameColorDark.at<Vec3f>(y,x)[c]/255.0,3);
-                    
+
             cvtColor(frameColor, frameColorDark, CV_RGB2YCrCb);
             split(frameColorDark, channels);
             darkenMatrix(channels.at(0));
             merge(channels, frameColorDark);*/
 
             //These can be used if threaded calculations is desired. Just dont forget to join (begining of try-block)
-            
+
             /*
             //Start thread 1 that will handle the YCrCb color
             thread YCrCbThread(trackYCrCbObjects, std::ref(frameColor), std::ref(threasholdYCrCb), std::ref(trackedYCrCb));
 
             //Start thread 2 that will handle the HSV color
             thread HSVThread(trackHSVObjects, std::ref(frameColor), threasholdHSV, std::ref(trackedHSV));
-            
+
             //Start thread 3 that will handle the circle detection
             thread CircleThread(trackCircles, std::ref(frameColor), std::ref(trackedCircles));
             */
@@ -1020,15 +1012,15 @@ int main(int argc, char** argv)
                 //YCrCbThread.join();
                 //HSVThread.join();
                 //CircleThread.join();
-                
+
                 //Match the filtered circles from YCrCb and HSV with eachother and set the prio
                 //matchObjects(trackedYCrCb, trackedHSV, bothTemp, false);
                 //matchObjects(bothTemp, trackedCircles, both, true);
 
-                
+
                 //matchObjects(trackedYCrCb, trackedCirclesYCrCb, tempVector, false);
                 //matchObjects(trackedHSV, trackedCirclesHSV, tempVector, false);
-                
+
                 matchObjects(trackedYCrCb, trackedHSV, bothTemp, false);
                 matchObjects(bothTemp, trackedCircles, both, true);
 
@@ -1040,16 +1032,16 @@ int main(int argc, char** argv)
                     matchLast(*iterator, both, i);
                     i++;
                 }
-                
+
                 //Set the distance for X, Y and Z for all the objects in the both vector
                 calculate3DPosition(both, frameColor, ballRadius, FOV_H, FOV_V);
-                
+
                 //Create pairs by their distance
                 createPairsByDistance(both, neighborhood, frameColor);
-                
+
                 //Match the pairs into triangles
                 matchTriangles(both, neighborhood);
-                
+
                 //Sort the "both" vector with the highest prio first
                 std::sort(both.begin(), both.end(), sorting);
 
@@ -1067,7 +1059,7 @@ int main(int argc, char** argv)
                     copyObject(both.at(2), lastPrio);
                     lastPrios.push_front(lastPrio);
                 }
-                
+
                 if(both.size() >= 3 && dflag >= 3)
                 {
                     Object temp = both.at(2);
@@ -1093,7 +1085,7 @@ int main(int argc, char** argv)
                     both.at(1) = temp2;
                     both.at(2) = temp3;
                 }
-                
+
 
                 calculatePlane(both, midPos, angles, frameColor, ballRadius, FOV_H, dflag);
 
@@ -1109,7 +1101,7 @@ int main(int argc, char** argv)
                 }
                 else if(rflag == 3)
                 {
-                    
+
                     cout << midPos[0] << DELIMITER_RECORD << midPos[1] << DELIMITER_RECORD << midPos[2] << DELIMITER_GROUP << angles[0] << DELIMITER_RECORD << angles[1] << DELIMITER_RECORD << angles[2] << endl;
                 }
 
@@ -1129,12 +1121,12 @@ int main(int argc, char** argv)
                         putText(frameColor, "Distance X: " + std::to_string((int)midPos.at(0)) + " cm", cv::Point(30, 30), 1, 1.6, cv::Scalar(0, 255, 255), 2);
                         putText(frameColor, "Distance Y: " + std::to_string((int)midPos.at(1)) + " cm", cv::Point(30, 55), 1, 1.6, cv::Scalar(0, 255, 255), 2);
                         putText(frameColor, "Distance Z: " + std::to_string((int)midPos.at(2)) + " cm", cv::Point(30, 80), 1, 1.6, cv::Scalar(0, 255, 255), 2);
-                        
+
                         putText(frameColor, "Pitch: " + std::to_string((int)angles.at(1)), cv::Point(30, 110), 1, 1.4, cv::Scalar(0, 255, 255), 2);
                         putText(frameColor, "Roll:  " + std::to_string((int)angles.at(2)), cv::Point(30, 130), 1, 1.4, cv::Scalar(0, 255, 255), 2);
                         putText(frameColor, "Yaw:   " + std::to_string((int)angles.at(0)), cv::Point(30, 150), 1, 1.4, cv::Scalar(0, 255, 255), 2);
                     }
-                    
+
                     //FPS
                     putText(frameColor,"FPS: "+std::to_string(fps),Point(30,180), 1, 1.2, cv::Scalar(0, 255, 255), 1);
 
@@ -1145,7 +1137,7 @@ int main(int argc, char** argv)
                     }
 
                 }
-                
+
                 //If in debug mode, print the prio to the screen
                 if(dflag >= 2)
                 {
@@ -1173,9 +1165,9 @@ int main(int argc, char** argv)
                     }
                     printPrio(both, frameColor);
                 }
-                
-                
-                
+
+
+
 
                 // Display image
                 if(dflag >= 1)
