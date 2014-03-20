@@ -1,39 +1,27 @@
-﻿// OpenCV webcam test.cpp : Defines the entry point for the console application.
-//
-
-//#include "stdafx.h"
-#include <opencv2/core/core.hpp>
+﻿#include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/opencv.hpp>
+#include <opencv2/gpu/gpu.hpp>
+
 #include <iostream>
-//#include <windows.h>
-//#include <Getopt.h>
 #include <stdio.h>
-//#include <unistd.h>
 #include <thread>
 #include <iterator>
-#include "Object.h"
-
-
 #include <iostream>
-#include "opencv2/opencv.hpp"
-#include "opencv2/gpu/gpu.hpp"
 
-
-#define PI 3.14159265
-#include "tclap/CmdLine.h"
+#include <tclap/CmdLine.h>
 #include <sys/timeb.h>
 
-#ifdef _LINUX || _UNIX || LINUX
-#include "../cam-share-linux/Read.cpp"
-#elseif _WIN32 || WIN32
-#include "../cam-share-windows/Read.cpp"
-#endif
+#define PI 3.14159265
+#include "Object.h"
+#include "Read.h"
 
 
 using namespace TCLAP;
 using namespace cv;
 using namespace std;
+
 
 //Delimiters
 char DELIMITER_GROUP = 29;
@@ -762,8 +750,8 @@ void darkenMatrix(Mat &frame)
 int main(int argc, char** argv)
 {
     string vflag = "";
+    string fflag = "";
     int dflag = 0;
-    int cflag = 0;
     int rflag = 0;
     int distflag = 0;
     try
@@ -772,12 +760,12 @@ int main(int argc, char** argv)
         CmdLine cmd(desc, ' ', "0.1");
         ValueArg<int> debug ("d", "debug", "Activate debug mode", false, 0, "int");
         ValueArg<string> video ("v", "video", "Save video", false, "", "string");
-        ValueArg<int> camera ("c", "camera", "Select camera", false, 0, "int");
+        ValueArg<string> file ("f", "logfile", "Set log file path", false, "caminfo.log", "string");
         ValueArg<int> release ("r", "release", "Activate release mode", false, 0, "int");
         ValueArg<int> distance ("s", "distance", "Set the desired distance", false, 0, "int");
         cmd.add( debug );
         cmd.add( video );
-        cmd.add( camera );
+        cmd.add( file );
         cmd.add( release );
         cmd.add( distance );
         // Parse arguments
@@ -786,7 +774,7 @@ int main(int argc, char** argv)
         // Do what you intend too...
         dflag = debug.getValue();
         vflag = video.getValue();
-        cflag = camera.getValue();
+        fflag = file.getValue();
         rflag = release.getValue();
         distflag = distance.getValue();
     }
@@ -798,9 +786,12 @@ int main(int argc, char** argv)
 
     if(dflag >= 1 && rflag <= 0)
     {
-        cout << "Camera set is: "<< cflag << endl;
+        cout << "Logfile set to: " << fflag << endl;
     }
-    Read *pRead = new Read("../cam-share/caminfo.log");
+
+    //Create a read object which will access the shared memory
+    Read *pRead = new Read(fflag, "cam-share-windows");
+    //Set the size which will be used then recoding the video
     cv::Size camSize(pRead->getWidth(), pRead->getHeight());
 
     //Varibles for FPS counting
@@ -954,7 +945,7 @@ int main(int argc, char** argv)
         //tempVector.clear();
 
         //read the frame from the shared camera memory
-        pRead->frame.copyTo(frameColor);
+        pRead->getFrame().copyTo(frameColor);
 
         frameColor.copyTo(frameColorUntouched);
 
