@@ -930,6 +930,11 @@ int main(int argc, char** argv)
 
     vector<Mat> channels;
 
+    //Force the image to be at 720x576 which is the frame-grabber's maximum resolution
+    CvCapture* capture = cvCreateCameraCapture(0);
+    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 576);
+    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 720);
+
     while (loop) {
 
         //Clear from old loop
