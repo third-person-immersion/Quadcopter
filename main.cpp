@@ -10,12 +10,18 @@
 #include <iterator>
 #include <iostream>
 
-#include <tclap/CmdLine.h>
+#include "tclap/CmdLine.h"
 #include <sys/timeb.h>
 
 #define PI 3.14159265
 #include "Object.h"
-#include "Read.h"
+
+#ifdef _WIN32
+#include "../cam-share/Read_windows.h"
+#else
+#include "../cam-share/Read_unix.h"
+#endif
+
 
 
 using namespace TCLAP;
@@ -790,7 +796,7 @@ int main(int argc, char** argv)
     }
 
     //Create a read object which will access the shared memory
-    Read *pRead = new Read(fflag, "cam-share-windows");
+    Read *pRead = new Read(fflag);
     //Set the size which will be used then recoding the video
     cv::Size camSize(pRead->getWidth(), pRead->getHeight());
 
