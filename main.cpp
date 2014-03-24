@@ -377,7 +377,7 @@ void createPairsByDistance(vector<Object> &objects, vector< vector<int> > &neigh
 
 void matchTriangles(vector<Object> &objects, vector< vector<int> > &neighborhood)
 {
-    int maxPrio;
+    double maxPrio;
     for(int resident = 0; resident < neighborhood.size(); ++resident)
     {
         maxPrio = objects.at(resident).getPrio();
