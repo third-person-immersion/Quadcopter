@@ -6,7 +6,7 @@ Object::Object(void)
     Object::matches = 0;
     Object::matchesPair = 0;
     Object::added = false;
-    Object::checked = false;
+    Object::includedInTriangle = false;
 }
 
 
@@ -136,10 +136,11 @@ void Object::setZDist(double dist){
     Object::zDist = dist;
 }
 
-bool Object::getChecked(){
-    return Object::checked;
+
+bool Object::getIncludedInTriangle(){
+    return Object::includedInTriangle;
 }
-   
-void Object::setChecked(bool value){
-    Object::checked = value;
+
+void Object::setIncludedInTriangle(bool value){
+    Object::includedInTriangle = value;
 }

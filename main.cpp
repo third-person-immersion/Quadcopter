@@ -33,8 +33,8 @@ using namespace std;
 char DELIMITER_GROUP = 29;
 char DELIMITER_RECORD = 30;
 
-int MAX_DISTANCE_BETWEEN_CIRCLES = 55;
-int MIN_DISTANCE_BETWEEN_CIRCLES = 40;
+int MAX_DISTANCE_BETWEEN_CIRCLES = 45;
+int MIN_DISTANCE_BETWEEN_CIRCLES = 26; //40
 int MINAREA = 2000;
 int MAXAREA = 15000;
 int ERODE = 30;
@@ -56,15 +56,20 @@ int cP2 = 30; //cerist papper
 int maxHoughRadius = 80;
 int darkenFactor = 1;
 
-//Distance between the balls (lol)
-int ballDist = 20;
+
+//The width of the sensor on the camera (in cm)
+int sensorWidth = 6.248 * 0.1; //5.75
+//The focal length (in cm)
+int focalLength = 16.53 * 0.1; //14
 
 //The radius of the current ball used
 double ballRadius = 7.5/2;
 //The Field Of View of the camera used at the moment
 //Microsoft webcam
-int FOV_H = 123;//48;//66; //48;
+int FOV_H = 62;//;123;//48;//66; //48;
 int FOV_V = 94;
+
+int doWeHaveNiceValues = 0;
 
 string windowTitle = "frame";
 
@@ -356,6 +361,8 @@ double distance3D(Object a, Object b)
 void createPairsByDistance(vector<Object> &objects, vector< vector<int> > &neighborhood, Mat &frame)
 {
     double distance;
+
+    int xPos, yPos;
     for(int i = 0; i < objects.size(); ++i)
     {
         vector<int> neighbors;
@@ -366,7 +373,26 @@ void createPairsByDistance(vector<Object> &objects, vector< vector<int> > &neigh
             {
                 neighbors.push_back(j);
                 //Här ritas avståndslinjer ut
-                //cv::line(frame, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), cv::Point(objects.at(j).getXPos(), objects.at(j).getYPos()),cv::Scalar(255, 255, 0), 3);
+                cv::line(frame, cv::Point(objects.at(i).getXPos(), objects.at(i).getYPos()), cv::Point(objects.at(j).getXPos(), objects.at(j).getYPos()),cv::Scalar(255, 255, 255), 2);
+
+                if(objects.at(i).getXPos() <= objects.at(j).getXPos())
+                {
+                    xPos = objects.at(i).getXPos() + (objects.at(j).getXPos() - objects.at(i).getXPos())/2;
+                }
+                else 
+                {
+                    xPos = objects.at(j).getXPos() + (objects.at(i).getXPos() - objects.at(j).getXPos())/2;
+                }
+                if(objects.at(i).getYPos() <= objects.at(j).getYPos())
+                {
+                    yPos = objects.at(i).getYPos() + (objects.at(j).getYPos() - objects.at(i).getYPos())/2;
+                }
+                else 
+                {
+                    yPos = objects.at(j).getYPos() + (objects.at(i).getYPos() - objects.at(j).getYPos())/2;
+                }
+
+                putText(frame, std::to_string(distance),Point(xPos, yPos), 1, 1.2, cv::Scalar(255, 255, 255), 1);
             }
 
         }
@@ -404,9 +430,10 @@ void matchTriangles(vector<Object> &objects, vector< vector<int> > &neighborhood
                     maxPrio = objects.at(neighborsNeighbor).getPrio();
                 }
                 if(std::find(neighborhood.at(neighborsNeighbor).begin(), neighborhood.at(neighborsNeighbor).end(), resident) != neighborhood.at(neighborsNeighbor).end() &&
-                !objects.at(resident).getChecked())
+                    !objects.at(resident).getIncludedInTriangle())
                 {
-                    objects.at(resident).setChecked(true);
+                    //Här har vi hittat trianglar!!
+                    objects.at(resident).setIncludedInTriangle(true);
                     objects.at(resident).incPrio(10);
                     objects.at(resident).incPrio((maxPrio - objects.at(resident).getPrio())/2);
                 }
@@ -442,6 +469,15 @@ void calculate3DPosition(vector<Object> &objects, Mat &frame, double ballRadius,
         objects.at(i).setXDist( (ballRadius / objects.at(i).getRadius()) * (objects.at(i).getXPos() - frame.cols/2) );
         objects.at(i).setYDist( (ballRadius / objects.at(i).getRadius()) * (objects.at(i).getYPos() - frame.rows/2) );
         objects.at(i).setZDist( ballRadius * frame.cols / (2*objects.at(i).getRadius()*tan(FOV_H * PI/360) ) );
+    }
+}
+
+void calculate3DPositionUsingFocalLength(vector<Object> &objects, Mat &frame, double ballRadius, int FOV_H, int FOV_V)
+{
+    for(int i=0; i<objects.size(); i++){
+        objects.at(i).setXDist( (ballRadius / objects.at(i).getRadius()) * (objects.at(i).getXPos() - frame.cols/2) );
+        objects.at(i).setYDist( (ballRadius / objects.at(i).getRadius()) * (objects.at(i).getYPos() - frame.rows/2) );
+        objects.at(i).setZDist( (ballRadius*frame.cols*focalLength)/(objects.at(i).getRadius()*sensorWidth) );
     }
 }
 
@@ -665,7 +701,7 @@ void copyObject(Object &src, vector<Object> &dst)
     o.setArea(src.getArea());
     o.setRadius(src.getRadius());
     o.setAdded(src.getAdded());
-    o.setChecked(src.getChecked());
+    o.setIncludedInTriangle(src.getIncludedInTriangle());
     o.setPrio(src.getPrio());
     o.setType(src.getType());
     o.setXDist(src.getXDist());
@@ -835,6 +871,10 @@ int main(int argc, char** argv)
     //The angles to the plane;
     vector<double> angles;
 
+    //Value that says how sure we are on our objects we found. Note that it will
+    //rarly reach 100% (1.0), but be around 50-70 in bad lighting (not tested in good lighting)
+    double sure;
+
     /** Microsoft webcam
         cerisa bollar
         YCbCr färger och HSV färger*/
@@ -842,15 +882,15 @@ int main(int argc, char** argv)
     //For YCbCr filtering
     Y_MIN = 0;
     Y_MAX = 256;
-    Cr_MIN = 109;
-    Cr_MAX = 165;
-    Cb_MIN = 156;
-    Cb_MAX = 242;
+    Cr_MIN = 114;//109;
+    Cr_MAX = 158;//165;
+    Cb_MIN = 151;//156;
+    Cb_MAX = 230;//242;
     //For HSV filtering
-    H_MIN = 112;
-    H_MAX = 133;
-    S_MIN = 88;
-    S_MAX = 256;
+    H_MIN = 117;//112;
+    H_MAX = 142;//133;
+    S_MIN = 119;//88;
+    S_MAX = 256;//256;
     V_MIN = 0;
     V_MAX = 256;
     //Same for both color filters
@@ -975,20 +1015,7 @@ int main(int argc, char** argv)
 
         if (!frameColor.empty()){
             // Blur the image a bit
-            GaussianBlur(frameColor, frameColor, Size(1, 1), 0, 0);
-
-            //Darken image
-            /*
-            frameColor.convertTo(frameColorDark, CV_32F);
-            for(int y=0; y<frameColorDark.rows; y++)
-               for(int x=0; x<frameColorDark.cols; x++)
-                 for(int c=0;c<3;c++)
-                    frameColorDark.at<Vec3f>(y,x)[c] = (darkenFactor/10.0)*pow(frameColorDark.at<Vec3f>(y,x)[c]/255.0,3);
-
-            cvtColor(frameColor, frameColorDark, CV_RGB2YCrCb);
-            split(frameColorDark, channels);
-            darkenMatrix(channels.at(0));
-            merge(channels, frameColorDark);*/
+            //GaussianBlur(frameColor, frameColor, Size(1, 1), 0, 0);
 
             //These can be used if threaded calculations is desired. Just dont forget to join (begining of try-block)
 
@@ -1096,6 +1123,9 @@ int main(int argc, char** argv)
                 calculatePlane(both, midPos, angles, frameColor, ballRadius, FOV_H, dflag);
 
                 //HERE WE HAVE OUR AWESOME VALUES. THEY LAY IN midPos AND angles!! OMG ERMAHGERD!
+                sure = both.at(0).getPrio() + both.at(1).getPrio() + both.at(2).getPrio();
+                sure /= 330;
+
 
                 if(rflag == 1)
                 {
@@ -1108,7 +1138,7 @@ int main(int argc, char** argv)
                 else if(rflag == 3)
                 {
 
-                    cout << midPos[0] << DELIMITER_RECORD << midPos[1] << DELIMITER_RECORD << midPos[2] << DELIMITER_GROUP << angles[0] << DELIMITER_RECORD << angles[1] << DELIMITER_RECORD << angles[2] << endl;
+                    cout << midPos[0] << DELIMITER_RECORD << midPos[1] << DELIMITER_RECORD << midPos[2] << DELIMITER_GROUP << angles[0] << DELIMITER_RECORD << angles[1] << DELIMITER_RECORD << angles[2] << DELIMITER_GROUP << sure << endl;
                 }
 
                 if(dflag >= 1)
@@ -1142,24 +1172,28 @@ int main(int argc, char** argv)
                         putText(frameColor,"Recording: "+ std::to_string(writeVideo),Point(30,210), 1, 1.2, cv::Scalar(0, 255, 255), 1);
                     }
 
+                    putText(frameColor, "Sure?:   " + std::to_string((int)(sure*100)), cv::Point(30, 240), 1, 1.4, cv::Scalar(0, 255, 255), 2);
+
                 }
 
                 //If in debug mode, print the prio to the screen
                 if(dflag >= 2)
                 {
+                    
                     int j = 0;
                     list< vector<Object> >::iterator iterator;
                     for (iterator = lastPrios.begin(); iterator != lastPrios.end(); iterator++){
                    // for (list<vector<Object>>::iterator iter = lastPrios.begin() ; iter != lastPrios.end(); iter++){
                         for(int i = 0; i<3; ++i)
                         {
-                            circle(frameColor, Point(iterator->at(i).getXPos(), iterator->at(i).getYPos()), iterator->at(i).getRadius(), Scalar(150, 0, 0, 42*(j+1)), 3);
+                            circle(frameColor, Point(iterator->at(i).getXPos(), iterator->at(i).getYPos()), iterator->at(i).getRadius(), Scalar(150, 0, 0, 42*(j+1)), 1/(j+1));
                         }
                         j++;
                     }
+                    
                     for(int i = 0; i<trackedCircles.size(); ++i)
                     {
-                        circle(frameColor, Point(trackedCircles.at(i).getXPos(), trackedCircles.at(i).getYPos()), trackedCircles.at(i).getRadius(), Scalar(255,255,0), 2);
+                        circle(frameColor, Point(trackedCircles.at(i).getXPos(), trackedCircles.at(i).getYPos()), trackedCircles.at(i).getRadius(), Scalar(255,255,0), 1);
                     }
                     for(int i = 0; i<trackedHSV.size(); ++i)
                     {

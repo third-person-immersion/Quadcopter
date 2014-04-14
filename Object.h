@@ -46,15 +46,15 @@ public:
     double getZDist();
     void setZDist(double dist);
 
-    bool getChecked();
-    void setChecked(bool value);
+    bool getIncludedInTriangle();
+    void setIncludedInTriangle(bool value);
 
 private:
 
 	double xPos, yPos, area, radius, prio,  xDist, yDist, zDist;
     int matches, matchesPair;
 	string type;
-	bool added, checked;
+	bool added, includedInTriangle;
 
 };
 
