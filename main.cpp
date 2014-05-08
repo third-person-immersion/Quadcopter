@@ -33,7 +33,7 @@ using namespace std;
 char DELIMITER_GROUP = 29;
 char DELIMITER_RECORD = 30;
 
-int MAX_DISTANCE_BETWEEN_CIRCLES = 45;
+int MAX_DISTANCE_BETWEEN_CIRCLES = 52;
 int MIN_DISTANCE_BETWEEN_CIRCLES = 26; //40
 int MINAREA = 2000;
 int MAXAREA = 15000;
@@ -41,13 +41,13 @@ int ERODE = 30;
 int DILATE = 60;
 int Y_MIN = 0;
 int Y_MAX = 256;
-int Cb_MIN = 133;
-int Cb_MAX = 184;
-int Cr_MIN = 0;
+int Cb_MIN = 81;
+int Cb_MAX = 224;
+int Cr_MIN = 147;
 int Cr_MAX = 256;
-int H_MIN = 0;
-int H_MAX = 256;
-int S_MIN = 0;
+int H_MIN = 116;
+int H_MAX = 176;
+int S_MIN = 77;
 int S_MAX = 256;
 int V_MIN = 0;
 int V_MAX = 256;
@@ -434,7 +434,7 @@ void matchTriangles(vector<Object> &objects, vector< vector<int> > &neighborhood
                 {
                     //Här har vi hittat trianglar!!
                     objects.at(resident).setIncludedInTriangle(true);
-                    objects.at(resident).incPrio(10);
+                    objects.at(resident).incPrio(20);
                     objects.at(resident).incPrio((maxPrio - objects.at(resident).getPrio())/2);
                 }
             }
@@ -977,10 +977,7 @@ int main(int argc, char** argv)
     vector<Mat> channels;
 
     //Force the image to be at 720x576 which is the frame-grabber's maximum resolution
-    CvCapture* capture = cvCreateCameraCapture(0);
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 576);
-    cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 720);
-
+   
     while (loop) {
 
         //Clear from old loop
@@ -1092,7 +1089,7 @@ int main(int argc, char** argv)
                     copyObject(both.at(2), lastPrio);
                     lastPrios.push_front(lastPrio);
                 }
-
+/*
                 if(both.size() >= 3 && dflag >= 3)
                 {
                     Object temp = both.at(2);
@@ -1119,12 +1116,12 @@ int main(int argc, char** argv)
                     both.at(2) = temp3;
                 }
 
-
+*/
                 calculatePlane(both, midPos, angles, frameColor, ballRadius, FOV_H, dflag);
 
                 //HERE WE HAVE OUR AWESOME VALUES. THEY LAY IN midPos AND angles!! OMG ERMAHGERD!
                 sure = both.at(0).getPrio() + both.at(1).getPrio() + both.at(2).getPrio();
-                sure /= 330;
+                sure /= 360;
 
 
                 if(rflag == 1)
